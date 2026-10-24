@@ -3,12 +3,27 @@
 
 const KEY = 'nappi.settings';
 
+const DEFAULT_PRESETS = Object.freeze({
+  oz: Object.freeze([2, 3, 4, 5, 6, 7]),
+  ml: Object.freeze([60, 90, 120, 150, 180, 210])
+});
+
 const DEFAULTS = Object.freeze({
   token: '',
   babyId: '',
   units: 'oz',
   baseUrl: 'https://api.nappi.app',
+  // Visible tiles in grid order (Status is always appended last by the state builder).
+  layout: Object.freeze(['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty', 'activity']),
+  // Empty means "use DEFAULT_PRESETS for the current units".
+  bottlePresets: Object.freeze([]),
+  defaultBottleType: 'formula',
+  exitAfterLog: false
 });
+
+function copy(value) {
+  return Array.isArray(value) ? value.slice() : value;
+}
 
 function createSettings(storage) {
   function read() {
@@ -18,9 +33,9 @@ function createSettings(storage) {
     } catch (e) {
       stored = {};
     }
-    const result = Object.assign({}, DEFAULTS);
+    const result = {};
     Object.keys(DEFAULTS).forEach((name) => {
-      if (name in stored) result[name] = stored[name];
+      result[name] = copy(name in stored ? stored[name] : DEFAULTS[name]);
     });
     return result;
   }
@@ -29,8 +44,8 @@ function createSettings(storage) {
     get: read,
     update(patch) {
       storage.setItem(KEY, JSON.stringify(Object.assign(read(), patch)));
-    },
+    }
   };
 }
 
-module.exports = { createSettings, DEFAULTS };
+module.exports = { createSettings, DEFAULTS, DEFAULT_PRESETS };

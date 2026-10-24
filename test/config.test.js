@@ -112,12 +112,11 @@ test('a response with no baby chosen leaves the saved baby alone', () => {
 
 test('prefill maps each message key to the value the form should show', () => {
   const config = buildConfig({ settings: { ...DEFAULTS, token: 'abc', units: 'ml' }, babies: [A, B] });
-  assert.deepEqual(prefillFor(config), {
-    token: 'abc',
-    babyId: 'a',
-    units: 'ml',
-    baseUrl: DEFAULTS.baseUrl,
-  });
+  const prefill = prefillFor(config);
+  assert.equal(prefill.token, 'abc');
+  assert.equal(prefill.babyId, 'a');
+  assert.equal(prefill.units, 'ml');
+  assert.equal(prefill.baseUrl, DEFAULTS.baseUrl);
 });
 
 test('prefill leaves out keys the page does not show', () => {

@@ -30,7 +30,32 @@
     "messageKeys": [
       "STATUS",
       "BABY_NAME",
-      "RETRY_AFTER"
+      "RETRY_AFTER",
+      "CMD",
+      "CMD_ID",
+      "ARG1",
+      "ARG2",
+      "ARG3",
+      "ARG4",
+      "ACK_ID",
+      "ACK_STATUS",
+      "BABY_COUNT",
+      "BABY_INDEX",
+      "BABY_NAMES",
+      "BABY_ACCENT",
+      "OTHER_TIMERS",
+      "UNITS",
+      "EXIT_AFTER_LOG",
+      "DEFAULT_BOTTLE",
+      "LAYOUT",
+      "PRESET[6]",
+      "LAST[8]",
+      "INFO[8]",
+      "TIMER_STATE[3]",
+      "TIMER_ELAPSED[3]",
+      "TIMER_SIDE[3]",
+      "TIMER_AT",
+      "PENDING"
     ],
     "resources": {
       "media": []

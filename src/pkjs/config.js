@@ -2,11 +2,26 @@
 // what comes back. Everything stays on the phone; nothing here is sent to
 // the watch.
 
-const { DEFAULTS } = require('./settings');
+const { DEFAULTS, DEFAULT_PRESETS } = require('./settings');
 const { resolveActiveBaby } = require('./babies');
 
 const NO_BABIES_HINT = 'Enter your API token and save, then reopen these settings to choose a baby. ' +
   'Create a token at nappi.app/app/connections.';
+
+// Default grid order; also the tie-break when two tiles share a position.
+const ACTION_ORDER = ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty', 'activity'];
+const ACTION_LABELS = {
+  diaper: 'Diaper', bottle: 'Bottle', nursing: 'Nursing', sleep: 'Sleep', pump: 'Pump', potty: 'Potty', activity: 'Activity'
+};
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
+const BOTTLE_TYPES = ['formula', 'breast_milk'];
+const MAX_PRESET = 1000;
+
+function positionOptions() {
+  const options = [{ label: 'Hidden', value: '0' }];
+  ORDINALS.forEach((label, i) => options.push({ label, value: String(i + 1) }));
+  return options;
+}
 
 function buildConfig(options) {
   const settings = options.settings;
@@ -20,8 +35,8 @@ function buildConfig(options) {
       label: 'API token',
       description: 'From nappi.app/app/connections. Use a dedicated token for this watch.',
       defaultValue: settings.token,
-      attributes: { type: 'password', autocomplete: 'off' },
-    },
+      attributes: { type: 'password', autocomplete: 'off' }
+    }
   ];
 
   if (babies.length > 0) {
@@ -30,7 +45,7 @@ function buildConfig(options) {
       messageKey: 'babyId',
       label: 'Baby',
       defaultValue: resolveActiveBaby(babies, settings.babyId).baby.id,
-      options: babies.map((b) => ({ label: b.name, value: b.id })),
+      options: babies.map((b) => ({ label: b.name, value: b.id }))
     });
   } else {
     items.push({ type: 'text', defaultValue: options.error || NO_BABIES_HINT });
@@ -43,8 +58,58 @@ function buildConfig(options) {
     defaultValue: settings.units,
     options: [
       { label: 'Ounces (oz)', value: 'oz' },
-      { label: 'Millilitres (ml)', value: 'ml' },
-    ],
+      { label: 'Millilitres (ml)', value: 'ml' }
+    ]
+  });
+
+  items.push({
+    type: 'section',
+    items: [{ type: 'heading', defaultValue: 'Home screen tiles' }].concat(
+      { type: 'text', defaultValue: 'Pick where each tile goes. Tiles fill the grid four to a page in this order; Status is always last.' },
+      ACTION_ORDER.map((action) => {
+        const at = settings.layout.indexOf(action);
+        return {
+          type: 'select',
+          messageKey: 'pos_' + action,
+          label: ACTION_LABELS[action],
+          defaultValue: String(at + 1),
+          options: positionOptions()
+        };
+      })
+    )
+  });
+
+  items.push({
+    type: 'section',
+    items: [
+      { type: 'heading', defaultValue: 'Bottles' },
+      {
+        type: 'input',
+        messageKey: 'bottlePresets',
+        label: 'Preset amounts',
+        description: 'Up to six amounts separated by commas, in the unit chosen above. Leave blank for ' +
+          DEFAULT_PRESETS[settings.units].join(', ') + '.',
+        defaultValue: settings.bottlePresets.join(', ')
+      },
+      {
+        type: 'select',
+        messageKey: 'defaultBottleType',
+        label: 'Default bottle type',
+        defaultValue: settings.defaultBottleType,
+        options: [
+          { label: 'Formula', value: 'formula' },
+          { label: 'Breast milk', value: 'breast_milk' }
+        ]
+      }
+    ]
+  });
+
+  items.push({
+    type: 'toggle',
+    messageKey: 'exitAfterLog',
+    label: 'Exit after logging',
+    description: 'Close the app after each logged entry instead of returning to the home screen.',
+    defaultValue: settings.exitAfterLog
   });
 
   items.push({
@@ -57,9 +122,9 @@ function buildConfig(options) {
         label: 'API address',
         description: 'Leave as is unless testing against a mock server.',
         defaultValue: settings.baseUrl,
-        attributes: { type: 'url', autocomplete: 'off' },
-      },
-    ],
+        attributes: { type: 'url', autocomplete: 'off' }
+      }
+    ]
   });
 
   items.push({ type: 'submit', defaultValue: 'Save' });
@@ -83,6 +148,27 @@ function plain(raw) {
   return raw && typeof raw === 'object' ? raw.value : raw;
 }
 
+function layoutFrom(response) {
+  const placed = [];
+  let sawAny = false;
+  ACTION_ORDER.forEach((action, order) => {
+    const raw = plain(response['pos_' + action]);
+    if (raw !== undefined) sawAny = true;
+    const pos = parseInt(raw, 10);
+    if (pos >= 1) placed.push({ action, pos, order });
+  });
+  if (!sawAny || placed.length === 0) return null;
+  placed.sort((a, b) => (a.pos - b.pos) || (a.order - b.order));
+  return placed.map((p) => p.action);
+}
+
+function presetsFrom(text) {
+  return String(text).split(/[\s,]+/)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0 && n <= MAX_PRESET)
+    .slice(0, 6);
+}
+
 function settingsFromClayResponse(response) {
   const patch = {};
   const token = plain(response.token);
@@ -98,7 +184,20 @@ function settingsFromClayResponse(response) {
   if (typeof baseUrl === 'string') {
     patch.baseUrl = baseUrl.trim().replace(/\/+$/, '') || DEFAULTS.baseUrl;
   }
+
+  const layout = layoutFrom(response);
+  if (layout) patch.layout = layout;
+
+  const presets = plain(response.bottlePresets);
+  if (presets !== undefined) patch.bottlePresets = presetsFrom(presets);
+
+  const bottleType = plain(response.defaultBottleType);
+  if (BOTTLE_TYPES.indexOf(bottleType) >= 0) patch.defaultBottleType = bottleType;
+
+  const exit = plain(response.exitAfterLog);
+  if (typeof exit === 'boolean') patch.exitAfterLog = exit;
+
   return patch;
 }
 
-module.exports = { buildConfig, settingsFromClayResponse, prefillFor };
+module.exports = { buildConfig, settingsFromClayResponse, prefillFor, ACTION_ORDER };
