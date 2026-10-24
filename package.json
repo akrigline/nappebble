@@ -7,7 +7,9 @@
   ],
   "private": true,
   "scripts": {
-    "test": "node --test \"test/**/*.test.js\"",
+    "test": "npm run test:js && npm run test:c",
+    "test:js": "node --test \"test/**/*.test.js\"",
+    "test:c": "make -s -C test/c",
     "mock": "node test/support/serve.js"
   },
   "dependencies": {

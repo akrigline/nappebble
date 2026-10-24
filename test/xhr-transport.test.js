@@ -77,3 +77,74 @@ test('header lines without a colon are ignored', async () => {
   const res = await createXhrTransport(FakeXhr)({ method: 'GET', url: 'https://x/', headers: {} });
   assert.deepEqual(res.headers, { etag: '"v1"' });
 });
+
+// ---- robustness: XHR implementations that never fire onerror / ontimeout ----
+// The emulator's XMLHttpRequest reports a refused connection only through
+// readystatechange (readyState 4, status 0). A transport that waits for
+// onerror hangs forever, and with it the whole sync engine.
+
+function fakeTimers() {
+  const t = { pending: [], cleared: [] };
+  t.set = (fn, ms) => { const h = { fn, ms }; t.pending.push(h); return h; };
+  t.clear = (h) => { t.cleared.push(h); t.pending = t.pending.filter((p) => p !== h); };
+  t.fire = () => t.pending.splice(0).forEach((h) => h.fn());
+  return t;
+}
+
+const REQ = { method: 'GET', url: 'https://x/', headers: {} };
+
+test('a connection failure reported only via readystatechange (status 0) rejects', async () => {
+  const { FakeXhr } = fakeXhr((x) => { x.readyState = 4; x.status = 0; x.onreadystatechange(); });
+  await assert.rejects(createXhrTransport(FakeXhr, fakeTimers())(REQ), /network/i);
+});
+
+test('a response reported only via readystatechange resolves', async () => {
+  const { FakeXhr } = fakeXhr((x) => {
+    x.readyState = 4; x.status = 200; x.responseText = '[]'; x.rawHeaders = 'ETag: "a"\r\n'; x.onreadystatechange();
+  });
+  const res = await createXhrTransport(FakeXhr, fakeTimers())(REQ);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.headers, { etag: '"a"' });
+});
+
+test('intermediate readystatechange events (readyState < 4) are ignored', async () => {
+  const { FakeXhr } = fakeXhr((x) => {
+    x.readyState = 2; x.status = 0; x.onreadystatechange();
+    x.readyState = 4; x.status = 200; x.responseText = 'ok'; x.onreadystatechange();
+  });
+  const res = await createXhrTransport(FakeXhr, fakeTimers())(REQ);
+  assert.equal(res.body, 'ok');
+});
+
+test('onload followed by readystatechange settles once, with the first result', async () => {
+  const { FakeXhr } = fakeXhr((x) => {
+    x.status = 201; x.responseText = 'first'; x.readyState = 4; x.onload();
+    x.status = 0; x.onreadystatechange();
+  });
+  const res = await createXhrTransport(FakeXhr, fakeTimers())(REQ);
+  assert.equal(res.status, 201);
+  assert.equal(res.body, 'first');
+});
+
+test('a request that never answers is failed by the watchdog and aborted', async () => {
+  const timers = fakeTimers();
+  let aborted = false;
+  const { FakeXhr } = fakeXhr(() => { /* the network never answers */ });
+  FakeXhr.prototype.abort = function () { aborted = true; };
+  const pending = createXhrTransport(FakeXhr, timers)(REQ);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(timers.pending.length, 1, 'watchdog armed');
+  assert.ok(timers.pending[0].ms >= 20000, 'longer than the XHR timeout so the XHR gets the first say');
+  timers.fire();
+  await assert.rejects(pending, /timed out/i);
+  assert.equal(aborted, true);
+});
+
+test('the watchdog is cleared once a response arrives', async () => {
+  const timers = fakeTimers();
+  const { FakeXhr } = fakeXhr((x) => { x.status = 200; x.responseText = '[]'; x.readyState = 4; x.onload(); });
+  await createXhrTransport(FakeXhr, timers)(REQ);
+  assert.equal(timers.pending.length, 0);
+  assert.equal(timers.cleared.length, 1);
+});

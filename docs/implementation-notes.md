@@ -1,0 +1,62 @@
+# Implementation notes: first full pass
+
+Status of `docs/pebble-nappi-spec-v2.md` against the code. Milestones M0 to M4 are built; M5 is not started.
+
+## What exists
+
+| Spec area | State |
+|---|---|
+| Home grid, colour tiles, 4 per page, page dots, swipe / button paging | Built. Layout and order come from phone settings. |
+| Running-timer banner replacing the header, tap to open the stop screen | Built |
+| Press feedback, lift-off activation, drag-out cancel, long-press, 1.5 s lockout | Built as host-tested C (`touch_fsm`, `lockout`) |
+| Diaper, Bottle (presets, type toggle, custom amount slider), Nursing, Sleep, Pump (with amount), Potty, Activity | Built |
+| Backdating (chip row; long-press opens the longer -5..-60 min set) | Built |
+| Multiple babies: switcher, accent colour per baby, every confirmation names the baby, dot (`*`) when another baby's timer runs | Built |
+| Offline write queue, idempotency keys, optimistic UI, ETag / 304, 429 handling, once-a-minute refresh | Built |
+| Button fallback (UP/DOWN focus, SELECT, long SELECT, BACK) | Built and exercised in the emulator |
+| Clay settings: token, baby, units, tile order/visibility, bottle presets, default bottle type, exit after log, API address | Built |
+| M5: launcher glance, timeline pins, Gabbro port | Not started |
+
+## Where it departs from the spec, and why
+
+- **Switch side is stop-then-start.** The API has no way to change the side of a running nursing timer. The watch sends `TIMER_SWITCH`; the phone queues a stop (which saves the feed on the current side) and a start on the other side. Each side becomes its own nursing entry.
+- **No "backdate start" on a running timer.** The API cannot edit a running timer's start, so it is only offered when starting (long-press the tile).
+- **Writes carry the tap time when delivered late.** A job queued more than 30 s ago is stamped with its queue time (`time` / `start_time` / `end_time`). Prompt sends carry no time, so a phone clock running ahead of the server cannot cause a "start in the future" rejection. Found by running the offline scenario in the emulator.
+- **Paused timers** (the API reports `paused`; the spec ignored it): shown as "Paused", clock frozen.
+- **Status / error screens are a header status plus the Status sheet**, not a full-screen takeover per error. Writes the API rejects for good (400/404) are dropped and logged, and the caches are reloaded; the watch does not yet tell the user.
+- **Page 2 is not special.** Status is the last tile in the user's layout (always appended), so it lands on page 2 only with the default order.
+- Acknowledgement is optimistic: the ACK means "queued", and the checkmark shows immediately. Delivery happens afterwards.
+
+## Verified, and not
+
+Automated (all run by `npm test`):
+- 305 JS tests against a mock of the whole API: contract tests for the mock itself, client, queue, engine, state builder, settings, Clay config, protocol sync, and the real `index.js` entry point under fake Pebble globals.
+- 319 C checks on the watch logic, compiled with `-Wall -Wextra -Werror -pedantic`.
+- `protocol-sync.test.js` fails if `protocol.h`, `protocol.js` or `package.json` message keys disagree.
+
+Exercised by hand in the Emery emulator with the mock server: launch from cache, status states, every sheet, diaper / bottle logging, sleep / nursing / pump timers, switch side, baby switching, paging by buttons, long-press backdating, and offline queue then recovery.
+
+**Not verified**
+- **Real touch.** The emulator has no touch injection here, so the touch handler in `grid_view.c` is untested end to end. The gesture logic it calls is unit-tested. Test on a Time 2 early.
+- **The real nappi API.** There is no token yet. The mock follows the published OpenAPI spec; the assumptions it had to make are listed at the top of `test/support/mock-nappi.js`.
+- **The Clay settings page in a browser or in the Core Devices app.** Only its data path was exercised.
+- **A real phone's XHR.** The emulator's XHR reports failures differently from a browser (see below); a real phone may differ again.
+- Exit-after-log, the custom-amount slider by touch, and persisted-cache launch after a cold start were not run on a device.
+
+## Things learned the hard way
+
+- The emulator's `XMLHttpRequest` signals a refused connection only via `readystatechange` (status 0). The transport listens to every signal and has its own watchdog; without that a dead network wedged the engine forever.
+- pkjs is bundled by webpack 1: ES2015 syntax only (`test/syntax.test.js` is a tripwire).
+- After changing `messageKeys`, run `pebble clean` or `MESSAGE_KEY_*` goes stale.
+- The touch API is raw (`TouchEvent_Touchdown` / `PositionUpdate` / `Liftoff`); taps, swipes and long-press are decided in `touch_fsm.c`.
+- Verification `curl`s against the mock share the app's token, so they eat the app's 12 reads/min.
+
+## Layout
+
+```
+src/pkjs/   phone: index.js (glue) app.js (engine) api.js queue.js commands.js optimistic.js state.js
+            config.js settings.js protocol.js wire.js time.js uuid.js xhr-transport.js babies.js
+src/c/      watch UI: main.c comm.c grid_view.c ui.c home.c sheets.c timer_view.c
+src/c/logic plain C, host-tested: fmt layout touch_fsm lockout slider model protocol.h
+test/       *.test.js (node:test), c/ (host C tests), support/ (mock API, harness, dev server)
+```

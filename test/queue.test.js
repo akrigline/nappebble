@@ -27,7 +27,7 @@ function setup(opts) {
   const client = createClient({ baseUrl: 'https://api.nappi.app', token: 't', transport });
   const storage = o.storage || memoryStorage();
   let n = 0;
-  const queue = createQueue({ storage, uuid: () => 'key-' + (++n) });
+  const queue = createQueue({ storage, uuid: () => 'key-' + (++n), now: () => clock.t, offsetAt: () => -240 });
   return { clock, mock, state, client, storage, queue };
 }
 
@@ -200,4 +200,93 @@ test('clear empties the queue', () => {
   h.queue.clear();
   assert.equal(h.queue.length(), 0);
   assert.equal(createQueue({ storage: h.storage, uuid: () => 'x' }).length(), 0);
+});
+
+// ---- jobs delivered late are stamped with when they were queued ----
+
+const MIN = 60 * 1000;
+const bodyOfPost = (h, i) => JSON.parse(h.state.sent.filter((r) => r.method === 'POST')[i || 0].body || 'null');
+
+test('a job delivered promptly carries no time, so the server uses its own clock', async () => {
+  const h = setup();
+  h.queue.enqueue(diaper('wet'));
+  h.clock.t += 10 * 1000;
+  await h.queue.flush(h.client);
+  assert.equal('time' in bodyOfPost(h), false);
+});
+
+test('an entry delivered late is stamped with the moment it was queued', async () => {
+  const h = setup();
+  h.state.down = true;
+  h.queue.enqueue(diaper('wet'));
+  await h.queue.flush(h.client);
+  h.state.down = false;
+  h.clock.t += 5 * MIN;
+  await h.queue.flush(h.client);
+  const sent = bodyOfPost(h, 1);
+  assert.equal(sent.time, '2026-10-24T15:00:00-04:00', 'the tap time, not the delivery time');
+});
+
+test('an explicit time (a backdated entry) is never overwritten', async () => {
+  const h = setup();
+  h.queue.enqueue({ kind: 'entry', babyId: BABY.id, body: { type: 'diaper', diaper_type: 'wet', time: '2026-10-24T14:30:00-04:00' } });
+  h.clock.t += 5 * MIN;
+  await h.queue.flush(h.client);
+  assert.equal(bodyOfPost(h).time, '2026-10-24T14:30:00-04:00');
+});
+
+test('a late timer start is stamped as start_time and a late stop as end_time', async () => {
+  const h = setup();
+  h.queue.enqueue({ kind: 'timer_start', babyId: BABY.id, timerType: 'sleep', body: undefined });
+  h.clock.t += 20 * MIN;
+  h.queue.enqueue({ kind: 'timer_stop', babyId: BABY.id, timerType: 'sleep', body: undefined });
+  h.clock.t += 40 * MIN;
+  const res = await h.queue.flush(h.client);
+  assert.equal(res.sent, 2);
+  assert.equal(bodyOfPost(h, 0).start_time, '2026-10-24T15:00:00-04:00');
+  assert.equal(bodyOfPost(h, 1).end_time, '2026-10-24T15:20:00-04:00');
+  const latest = await h.client.latest(BABY.id, { types: ['sleep'] });
+  assert.equal(latest.data.sleep.duration_minutes, 20, 'the sleep lasted from tap to tap, not to delivery');
+});
+
+test('an explicit start_time on a late timer start is kept', async () => {
+  const h = setup();
+  h.queue.enqueue({ kind: 'timer_start', babyId: BABY.id, timerType: 'sleep', body: { start_time: '2026-10-24T14:00:00-04:00' } });
+  h.clock.t += 10 * MIN;
+  await h.queue.flush(h.client);
+  assert.equal(bodyOfPost(h).start_time, '2026-10-24T14:00:00-04:00');
+});
+
+test('other body fields survive stamping, and the stored job is not altered', async () => {
+  const h = setup();
+  h.state.down = true;
+  h.queue.enqueue({ kind: 'timer_start', babyId: BABY.id, timerType: 'nursing', body: { side: 'left' } });
+  await h.queue.flush(h.client);
+  h.state.down = false;
+  h.clock.t += 5 * MIN;
+  await h.queue.flush(h.client);
+  const sent = bodyOfPost(h, 1);
+  assert.equal(sent.side, 'left');
+  assert.ok(sent.start_time);
+});
+
+test('the stale threshold is 30 seconds', async () => {
+  const h = setup();
+  h.queue.enqueue(diaper('wet'));
+  h.clock.t += 29 * 1000;
+  await h.queue.flush(h.client);
+  assert.equal('time' in bodyOfPost(h), false);
+  const h2 = setup();
+  h2.queue.enqueue(diaper('wet'));
+  h2.clock.t += 31 * 1000;
+  await h2.queue.flush(h2.client);
+  assert.ok(bodyOfPost(h2).time);
+});
+
+test('jobs persisted before this field existed still flush (no queuedAt)', async () => {
+  const h = setup();
+  h.storage.setItem('nappi.queue', JSON.stringify([{ kind: 'entry', babyId: BABY.id, body: { type: 'diaper', diaper_type: 'wet' }, key: 'old-1' }]));
+  const q = createQueue({ storage: h.storage, uuid: () => 'x', now: () => h.clock.t, offsetAt: () => 0 });
+  const res = await q.flush(h.client);
+  assert.equal(res.sent, 1);
 });

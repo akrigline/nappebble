@@ -1,16 +1,18 @@
 # pebble-nappi
 
-Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `../docs/pebble-nappi-spec-v2.md`. API notes: `../docs/nappi-api.md`.
+Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `../docs/pebble-nappi-spec-v2.md`. API notes: `../docs/nappi-api.md`. What is built, what differs from the spec, and what is unverified: `docs/implementation-notes.md`.
 
 ## Commands
 
 ```sh
-npm test                        # node:test suite, no Pebble tooling needed
+npm test                        # JS tests (node:test) then host-side C tests; no Pebble tooling needed
+npm run test:js | test:c        # either half alone
 pebble build                    # emery .pbw (SDK 4.33.1)
-npm run mock                    # fake nappi API on http://127.0.0.1:4010 (TWO_BABIES=1 adds a second baby)
+SEED=1 TWO_BABIES=1 npm run mock   # fake nappi API on http://127.0.0.1:4010, with some history
 pebble install --emulator emery
 pebble logs --emulator emery
 pebble screenshot --emulator emery out.png
+pebble emu-button click select down up back   # button fallback; add --duration 900 for a long press
 ```
 
 Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` (no Premium).
@@ -21,9 +23,11 @@ Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` 
 
 ## Layout
 
-- `src/c/main.c` watch UI (M0: baby name + status).
 - `src/pkjs/` phone logic. `index.js` is the only file touching Pebble globals; everything else is plain CommonJS under test.
-- `test/support/` mock nappi API (`mock-nappi.js`) and its HTTP wrapper.
+- `src/c/logic/` the watch's decisions as plain C (formatting, geometry, touch gestures, lockout, slider, tile text), unit-tested on the host with gcc.
+- `src/c/` the Pebble UI: one reusable `GridView` window drives Home and every sheet.
+- `src/pkjs/protocol.js` is the source of truth for enums and message keys; `src/c/logic/protocol.h` and `package.json` must match, and a test enforces it.
+- `test/support/` mock nappi API (`mock-nappi.js`), engine harness, HTTP wrapper and dev server.
 
 ## Gotchas
 
@@ -31,3 +35,4 @@ Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` 
 - After changing `messageKeys` in `package.json`, run `pebble clean` or the generated `MESSAGE_KEY_*` header goes stale.
 - Clay builds its widgets from the config passed to its constructor, so `index.js` makes a new Clay per settings page.
 - The docs give no error code for 429 or 404; the client branches on HTTP status for 429.
+- The emulator's XHR reports a refused connection only through `readystatechange`; `xhr-transport.js` copes and has a watchdog.

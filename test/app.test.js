@@ -237,6 +237,22 @@ test('offline writes are acknowledged, kept, and delivered once the phone is bac
   assert.equal(server.diaper.diaper_type, 'mixed');
 });
 
+test('an entry logged offline keeps the time of the tap, not the time it was finally delivered', async () => {
+  const h = harness();
+  await h.app.start();
+  h.net.offline = true;
+  await h.app.onMessage(DIAPER_CMD(1, P.DIAPER.WET));
+  await h.app.idle();
+  h.net.offline = false;
+  h.clock.t += 5 * MIN;
+  await h.app.onMessage({ CMD: P.CMD.REFRESH });
+  await h.app.idle();
+  const delivered = JSON.parse(h.writes().filter((r) => r.body && r.body.includes('wet')).pop().body);
+  assert.equal(delivered.time, '2026-10-24T15:00:00-04:00');
+  const server = JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/entries/latest?types=diaper`).body);
+  assert.equal(server.diaper.time, '2026-10-24T19:00:00Z');
+});
+
 test('offline writes survive an app restart', async () => {
   const storage = memoryStorage();
   const first = harness({ storage });

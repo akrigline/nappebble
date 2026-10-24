@@ -7,11 +7,20 @@
 //   stop: null, or { kind: 'network' | 'rate_limited' | 'auth', retryAfter, error }
 //   dropped: [{ job, error }] jobs the API rejected for good (400/404/...)
 
+const { toIsoOffset } = require('./time');
+
 const KEY = 'nappi.queue';
+// A job delivered later than this is stamped with when it was queued. Prompt
+// sends carry no time so the server's own clock decides, which avoids "start
+// time in the future" rejections when the phone clock runs a little fast.
+const STALE_MS = 30 * 1000;
+const STAMP_FIELD = { entry: 'time', timer_start: 'start_time', timer_stop: 'end_time' };
 
 function createQueue(deps) {
   const storage = deps.storage;
   const uuid = deps.uuid;
+  const now = deps.now || Date.now;
+  const offsetAt = deps.offsetAt || function () { return 0; };
   let jobs = load();
   let running = null;
 
@@ -28,7 +37,17 @@ function createQueue(deps) {
     storage.setItem(KEY, JSON.stringify(jobs));
   }
 
-  function execute(client, job) {
+  // Delivered late (offline, rate limited): record when it really happened.
+  function stamped(job) {
+    const field = STAMP_FIELD[job.kind];
+    if (!field || typeof job.queuedAt !== 'number' || now() - job.queuedAt < STALE_MS) return job;
+    const body = Object.assign({}, job.body);
+    if (body[field] === undefined) body[field] = toIsoOffset(job.queuedAt, offsetAt(job.queuedAt));
+    return Object.assign({}, job, { body });
+  }
+
+  function execute(client, original) {
+    const job = stamped(original);
     switch (job.kind) {
       case 'entry': return client.logEntry(job.babyId, job.body, job.key);
       case 'timer_start': return client.startTimer(job.babyId, job.timerType, job.body);
@@ -90,7 +109,7 @@ function createQueue(deps) {
 
   return {
     enqueue(job) {
-      const queued = Object.assign({}, job, { key: uuid() });
+      const queued = Object.assign({}, job, { key: uuid(), queuedAt: now() });
       jobs.push(queued);
       save();
       return queued;

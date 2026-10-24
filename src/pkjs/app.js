@@ -34,7 +34,7 @@ function emptyBaby() {
 
 function createApp(deps) {
   const settings = deps.settings;
-  const queue = createQueue({ storage: deps.storage, uuid: deps.uuid });
+  const queue = createQueue({ storage: deps.storage, uuid: deps.uuid, now: deps.now, offsetAt: deps.offsetAt });
   const log = deps.log || function () {};
 
   let cache = loadCache();
