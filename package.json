@@ -1,0 +1,33 @@
+{
+  "name": "pebble-nappi",
+  "author": "MakeAwesomeHappen",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "scripts": {
+    "test": "node --test test/",
+    "mock": "node test/support/serve.js"
+  },
+  "dependencies": {},
+  "pebble": {
+    "displayName": "nappi",
+    "uuid": "9d7f77ad-7857-480d-b1fa-73eff0df3926",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "capabilities": [
+      "configurable"
+    ],
+    "messageKeys": [
+      "dummy"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

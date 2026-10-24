@@ -1,0 +1,7 @@
+build/
+node_modules/
+.lock-waf*
+.wafpickle*
+*.pbw
+.env
+.env.*
