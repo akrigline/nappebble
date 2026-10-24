@@ -1,7 +1,7 @@
 // Builds the compact state dict the watch renders (see protocol.js for the
 // keys). Epoch seconds and small enums only; the watch formats the text.
 //
-// view: { status, retryAfter, babies, activeIndex, latest, timers,
+// view: { status, retryAfter, babies, activeIndex, latest, timers, timersAt (ms, optional),
 //         othersRunning, settings, pending, now }
 
 const P = require('./protocol');
@@ -117,7 +117,8 @@ function buildState(view) {
     state.TIMER_ELAPSED[i] = timer ? timer.elapsed_seconds : 0;
     state.TIMER_SIDE[i] = timer ? sideId(timer.side) : P.SIDE.NONE;
   });
-  state.TIMER_AT = Math.floor(view.now / 1000);
+  // Elapsed values are valid as of this instant; the watch ticks on from here.
+  state.TIMER_AT = Math.floor((view.timersAt || view.now) / 1000);
   return state;
 }
 

@@ -4,7 +4,7 @@
 // rest back.
 //
 // flush(client) -> { sent, remaining, stop, dropped }
-//   stop: null, or { kind: 'network' | 'rate_limited' | 'auth', retryAfter }
+//   stop: null, or { kind: 'network' | 'rate_limited' | 'auth', retryAfter, error }
 //   dropped: [{ job, error }] jobs the API rejected for good (400/404/...)
 
 const KEY = 'nappi.queue';
@@ -45,11 +45,11 @@ function createQueue(deps) {
   // 'done' | 'drop' | { kind, retryAfter }
   function classify(job, err) {
     const status = err && err.status;
-    if (status === 429) return { kind: 'rate_limited', retryAfter: err.retryAfter };
-    if (status === 401 || status === 403) return { kind: 'auth', retryAfter: null };
+    if (status === 429) return { kind: 'rate_limited', retryAfter: err.retryAfter, error: err };
+    if (status === 401 || status === 403) return { kind: 'auth', retryAfter: null, error: err };
     if (status === 409 && job.kind === 'timer_stop' && err.code === 'timer_not_running') return 'done';
     if (status >= 400 && status < 500) return 'drop';
-    return { kind: 'network', retryAfter: null };
+    return { kind: 'network', retryAfter: null, error: err };
   }
 
   function run(client) {
