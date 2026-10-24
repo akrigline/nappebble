@@ -2,13 +2,17 @@
   "name": "pebble-nappi",
   "author": "MakeAwesomeHappen",
   "version": "1.0.0",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test \"test/**/*.test.js\"",
     "mock": "node test/support/serve.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
   "pebble": {
     "displayName": "nappi",
     "uuid": "9d7f77ad-7857-480d-b1fa-73eff0df3926",
@@ -24,7 +28,9 @@
       "configurable"
     ],
     "messageKeys": [
-      "dummy"
+      "STATUS",
+      "BABY_NAME",
+      "RETRY_AFTER"
     ],
     "resources": {
       "media": []
