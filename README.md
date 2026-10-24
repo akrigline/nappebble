@@ -1,36 +1,33 @@
 # pebble-nappi
 
-A Pebble watchapp/watchface written in C using the Pebble SDK.
+Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `../docs/pebble-nappi-spec-v2.md`. API notes: `../docs/nappi-api.md`.
 
-## Building & running
+## Commands
 
 ```sh
-pebble build                          # build for all targetPlatforms
-pebble install --emulator emery       # install on the emery emulator
-pebble install --phone <ip>           # install to a paired phone
+npm test                        # node:test suite, no Pebble tooling needed
+pebble build                    # emery .pbw (SDK 4.33.1)
+npm run mock                    # fake nappi API on http://127.0.0.1:4010 (TWO_BABIES=1 adds a second baby)
+pebble install --emulator emery
+pebble logs --emulator emery
+pebble screenshot --emulator emery out.png
 ```
 
-## Target platforms
+Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` (no Premium).
 
-`targetPlatforms` in `package.json` controls which watches you build for. The
-modern Pebble hardware is **emery** (Pebble Time 2), **gabbro** (Pebble Round
-2), and **flint** (Pebble 2 Duo); the original Pebble platforms (aplite,
-basalt, chalk, diorite) are included by default for backwards compatibility.
+## Driving settings in the emulator
 
-## Project layout
+`pebble emu-app-config --emulator emery` opens the Clay page and listens on `http://localhost:<port>/close?`. The page's Save button redirects there with the form values. To skip the browser, GET that URL yourself with the URL-encoded JSON, e.g. `{"token":{"value":"dev-token"},"baseUrl":{"value":"http://localhost:4010"}}`. The port is in the generated `~/pebble-tool-emu-app-config-*.html` (`return_to=`), which the tool deletes once used.
 
-```
-src/c/           C source for the watchapp
-src/pkjs/        PebbleKit JS (phone-side) source, if any
-worker_src/c/    Background worker source, if any
-resources/       Images, fonts, and other bundled resources
-package.json     Project metadata (UUID, platforms, resources, message keys)
-wscript          Build rules — usually no need to edit
-```
+## Layout
 
-By default this project is configured as a watchapp. To make it a watchface,
-set `pebble.watchapp.watchface` to `true` in `package.json`.
+- `src/c/main.c` watch UI (M0: baby name + status).
+- `src/pkjs/` phone logic. `index.js` is the only file touching Pebble globals; everything else is plain CommonJS under test.
+- `test/support/` mock nappi API (`mock-nappi.js`) and its HTTP wrapper.
 
-## Documentation
+## Gotchas
 
-Full SDK docs, tutorials, and API reference: <https://developer.repebble.com>
+- pkjs is bundled by webpack 1: stay within ES2015 syntax (no trailing commas in calls, no object spread, no async/await). `test/syntax.test.js` is a tripwire; `pebble build` is the authority.
+- After changing `messageKeys` in `package.json`, run `pebble clean` or the generated `MESSAGE_KEY_*` header goes stale.
+- Clay builds its widgets from the config passed to its constructor, so `index.js` makes a new Clay per settings page.
+- The docs give no error code for 429 or 404; the client branches on HTTP status for 429.
