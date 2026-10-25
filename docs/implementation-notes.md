@@ -23,7 +23,7 @@ Status of `docs/pebble-nappi-spec-v2.md` against the code. Milestones M0 to M4 a
 ## Where it departs from the spec, and why
 
 - **Switch side is stop-then-start.** The API has no way to change the side of a running nursing timer. The watch sends `TIMER_SWITCH`; the phone queues a stop (which saves the feed on the current side) and a start on the other side. Each side becomes its own nursing entry.
-- **No "backdate start" on a running timer.** The API cannot edit a running timer's start, so it is only offered when starting (long-press the tile).
+- **No "backdate start" on a running timer.** The API cannot edit a running timer's start, so backdating is only offered on the start sheet, through the time strip (reached by a tap, or by a long press on Sleep and Pump).
 - **Writes carry the tap time when delivered late.** A job queued more than 30 s ago is stamped with its queue time (`time` / `start_time` / `end_time`). Prompt sends carry no time, so a phone clock running ahead of the server cannot cause a "start in the future" rejection. Found by running the offline scenario in the emulator.
 - **Paused timers** (the API reports `paused`; the spec ignored it): shown as "Paused", clock frozen.
 - **Status / error screens are a header status plus the Status sheet**, not a full-screen takeover per error. Writes the API rejects for good (400/404) are dropped and logged, and the caches are reloaded; the watch does not yet tell the user.
@@ -41,7 +41,7 @@ Automated (all run by `npm test`):
 - 354 C checks on the watch logic, compiled with `-Wall -Wextra -Werror -pedantic`.
 - `protocol-sync.test.js` fails if `protocol.h`, `protocol.js` or `package.json` message keys disagree.
 
-Exercised by hand in the Emery emulator with the mock server: launch from cache, status states, every sheet, diaper / bottle logging, sleep / nursing / pump timers, switch side, baby switching, paging by buttons, long-press backdating, and offline queue then recovery.
+Exercised by hand in the Emery emulator with the mock server: launch from cache, status states, every sheet, diaper / bottle logging, sleep / nursing / pump timers, switch side, baby switching, paging by buttons, backdating with the time strip driven by buttons, and offline queue then recovery. Touch dragging on the strips was not run.
 
 **Not verified**
 - **Real touch.** The emulator has no touch injection here, so the touch handler in `grid_view.c` is untested end to end. The gesture logic it calls is unit-tested. Test on a Time 2 early.
@@ -72,6 +72,6 @@ Exercised by hand in the Emery emulator with the mock server: launch from cache,
 src/pkjs/   phone: index.js (glue) app.js (engine) api.js queue.js commands.js optimistic.js state.js
             config.js settings.js protocol.js wire.js time.js uuid.js xhr-transport.js babies.js
 src/c/      watch UI: main.c comm.c grid_view.c ui.c home.c sheets.c timer_view.c
-src/c/logic plain C, host-tested: fmt layout touch_fsm lockout slider model protocol.h
+src/c/logic plain C, host-tested: fmt layout touch_fsm lockout strip amount nav model protocol.h
 test/       *.test.js (node:test), c/ (host C tests), support/ (mock API, harness, dev server)
 ```

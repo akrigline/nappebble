@@ -26,7 +26,7 @@ Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bot
 ## Layout
 
 - `src/pkjs/` phone logic. `index.js` is the only file touching Pebble globals; everything else is plain CommonJS under test.
-- `src/c/logic/` the watch's decisions as plain C (formatting, geometry, touch gestures, lockout, slider, tile text), unit-tested on the host with gcc.
+- `src/c/logic/` the watch's decisions as plain C (formatting, geometry, touch gestures, lockout, strips, tile text), unit-tested on the host with gcc.
 - `src/c/` the Pebble UI: one reusable `GridView` window drives Home and every sheet.
 - `src/pkjs/protocol.js` is the source of truth for enums and message keys; `src/c/logic/protocol.h` and `package.json` must match, and a test enforces it.
 - `test/support/` mock nappi API (`mock-nappi.js`), engine harness, HTTP wrapper and dev server.
