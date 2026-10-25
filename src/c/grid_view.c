@@ -26,7 +26,7 @@ static GRect inset(Rect r, int dx, int dy, int h) {
 }
 
 static bool focusable(const GridCell *c) {
-  return c->enabled && c->kind != CELL_TEXT;
+  return c->enabled && c->kind != CELL_TEXT && c->kind != CELL_STRIP;
 }
 
 // ---- drawing ----
@@ -46,6 +46,12 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
   if (!c->enabled && c->kind != CELL_HEADER && c->kind != CELL_TEXT) {
     bg = GColorLightGray;
     fg = GColorDarkGray;
+  }
+  // A chosen chip is filled in rather than outlined.
+  bool chosen_chip = c->selected && c->enabled && c->kind == CELL_CHIP;
+  if (chosen_chip) {
+    bg = GColorBlack;
+    fg = GColorWhite;
   }
   if (pressed) {
     GColor swap = bg;
@@ -77,6 +83,15 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
       graphics_context_set_fill_color(ctx, c->dot);
       graphics_fill_circle(ctx, centre, 4);
     }
+  } else if (c->kind == CELL_STRIP) {
+    // Readout centred in the top half; track and knob in the bottom half.
+    draw_text(ctx, c->title, FONT_KEY_GOTHIC_14_BOLD, GRect(r.x, r.y + (r.h / 2 - 14) / 2 - 3, r.w, 18),
+              GTextAlignmentCenter, fg);
+    int track_y = r.y + r.h - 10;
+    graphics_context_set_fill_color(ctx, GColorLightGray);
+    graphics_fill_rect(ctx, GRect(c->geom.x, track_y - 2, c->geom.w, 4), 2, GCornersAll);
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_fill_circle(ctx, GPoint(strip_x_for(&c->geom, c->strip_value), track_y), 8);
   } else if (c->kind == CELL_TILE) {
     draw_text(ctx, c->title, FONT_KEY_GOTHIC_14_BOLD, inset(r, 6, 4, 16), GTextAlignmentLeft, fg);
     draw_text(ctx, c->l1, FONT_KEY_GOTHIC_24_BOLD, inset(r, 6, 30, 30), GTextAlignmentLeft, fg);
@@ -92,16 +107,41 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
     draw_text(ctx, c->title, FONT_KEY_GOTHIC_18_BOLD, GRect(r.x, r.y + (r.h - 22) / 2 - 2, r.w, 22), GTextAlignmentCenter, fg);
   }
 
-  if (c->selected && c->kind != CELL_HEADER) {
+  if (c->selected && c->kind != CELL_HEADER && !chosen_chip) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, 3);
     graphics_draw_round_rect(ctx, grect(r), CORNER);
   }
-  if (gv->show_focus && gv->focus == i) {
+  if (!gv->has_nav && gv->show_focus && gv->focus == i) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, 3);
     graphics_draw_round_rect(ctx, GRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2), CORNER);
   }
+}
+
+// Nav views ring the whole current zone (ADJUST) or its current item (CHOICE).
+static void draw_zone_focus(GContext *ctx, const GridView *gv) {
+  if (gv->nav.zone_count == 0) return;
+  int z = gv->nav.zone;
+  int first = gv->zone_cell[z];
+  int n = gv->zone_cells[z];
+  if (gv->nav.zones[z].kind == ZONE_CHOICE) {
+    first += gv->nav.item;
+    n = 1;
+  }
+  if (first < 0 || n <= 0 || first + n > gv->count) return;
+  Rect u = gv->cells[first].rect;
+  int x1 = u.x + u.w, y1 = u.y + u.h;
+  for (int i = first + 1; i < first + n; i++) {
+    Rect r = gv->cells[i].rect;
+    if (r.x < u.x) u.x = r.x;
+    if (r.y < u.y) u.y = r.y;
+    if (r.x + r.w > x1) x1 = r.x + r.w;
+    if (r.y + r.h > y1) y1 = r.y + r.h;
+  }
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_width(ctx, 3);
+  graphics_draw_round_rect(ctx, GRect(u.x + 1, u.y + 1, x1 - u.x - 2, y1 - u.y - 2), CORNER);
 }
 
 static void draw_slider(GContext *ctx, const GridView *gv) {
@@ -146,6 +186,7 @@ static void layer_update(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
   for (int i = 0; i < gv->count; i++) draw_cell(ctx, gv, i);
   if (gv->has_slider) draw_slider(ctx, gv);
+  if (gv->has_nav && gv->show_focus) draw_zone_focus(ctx, gv);
   draw_dots(ctx, gv);
   draw_overlay(ctx, gv);
 }
@@ -189,6 +230,23 @@ void grid_view_commit(GridView *gv) {
   }
   touch_fsm_set_rects(&gv->fsm, rects, n);
   if (gv->focus >= gv->count) gv->focus = gv->count - 1;
+  redraw(gv);
+}
+
+static void click_config(void *ctx);
+
+void grid_view_set_zones(GridView *gv, const NavZone *zones, const int *first_cell, const int *cell_count, int count) {
+  if (count > NAV_MAX_ZONES) count = NAV_MAX_ZONES;
+  if (count < 0) count = 0;
+  nav_init(&gv->nav, zones, count);
+  for (int i = 0; i < count; i++) {
+    gv->zone_cell[i] = first_cell[i];
+    gv->zone_cells[i] = cell_count[i];
+  }
+  gv->has_nav = count > 0;
+  gv->show_focus = true;
+  // Re-run the click config so Back is subscribed if the window is already up.
+  window_set_click_config_provider_with_context(gv->window, click_config, gv);
   redraw(gv);
 }
 
@@ -265,6 +323,16 @@ static void press_tick(void *data) {
   if (gv->fsm.active && gv->press_timer == NULL) gv->press_timer = app_timer_register(100, press_tick, gv);
 }
 
+static int strip_at(const GridView *gv, int x, int y) {
+  for (int i = 0; i < gv->count; i++) {
+    const GridCell *c = &gv->cells[i];
+    if (c->kind != CELL_STRIP || !c->enabled) continue;
+    Rect r = c->rect;
+    if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return i;
+  }
+  return -1;
+}
+
 static bool in_slider(const GridView *gv, int x, int y) {
   if (!gv->has_slider) return false;
   Rect t = gv->slider_track;
@@ -274,6 +342,20 @@ static bool in_slider(const GridView *gv, int x, int y) {
 static void touch_handler(const TouchEvent *e, void *context) {
   GridView *gv = context;
   if (e->non_navigational || gv->overlay) return;
+
+  // A strip owns the whole gesture from its touchdown, wherever the finger goes.
+  if (e->type == TouchEvent_Touchdown) {
+    int strip = strip_at(gv, e->x, e->y);
+    if (strip >= 0) gv->strip_drag = strip;
+  }
+  if (gv->strip_drag >= 0) {
+    if (e->type == TouchEvent_Liftoff) {
+      gv->strip_drag = -1;
+    } else if (gv->h.on_strip) {
+      gv->h.on_strip(gv, gv->strip_drag, e->x);
+    }
+    return;
+  }
 
   if (in_slider(gv, e->x, e->y) && e->type != TouchEvent_Liftoff) {
     if (gv->h.on_slider) gv->h.on_slider(gv, e->y);
@@ -342,16 +424,66 @@ static void move_focus(GridView *gv, int dir) {
   redraw(gv);
 }
 
+// Nav views: the first press after a touch only brings the ring back.
+static bool reveal_focus(GridView *gv) {
+  if (gv->show_focus) return false;
+  gv->show_focus = true;
+  redraw(gv);
+  return true;
+}
+
+static void apply_nav(GridView *gv, NavEffect e) {
+  switch (e.kind) {
+    case NAV_ADJUST:
+      if (gv->h.on_adjust) gv->h.on_adjust(gv, e.zone, e.dir);
+      redraw(gv);
+      break;
+    case NAV_MOVED:
+      redraw(gv);
+      break;
+    case NAV_ACTIVATE:
+      if (gv->h.on_activate) gv->h.on_activate(gv, gv->zone_cell[e.zone] + e.item, false);
+      break;
+    case NAV_LEAVE:
+      window_stack_pop(true);
+      break;
+    case NAV_NONE:
+      break;
+  }
+}
+
 static void up_click(ClickRecognizerRef r, void *ctx) {
-  move_focus(ctx, -1);
+  GridView *gv = ctx;
+  if (gv->has_nav) {
+    if (!reveal_focus(gv)) apply_nav(gv, nav_up(&gv->nav));
+    return;
+  }
+  move_focus(gv, -1);
 }
 
 static void down_click(ClickRecognizerRef r, void *ctx) {
-  move_focus(ctx, 1);
+  GridView *gv = ctx;
+  if (gv->has_nav) {
+    if (!reveal_focus(gv)) apply_nav(gv, nav_down(&gv->nav));
+    return;
+  }
+  move_focus(gv, 1);
+}
+
+static void back_click(ClickRecognizerRef r, void *ctx) {
+  GridView *gv = ctx;
+  // Back always acts, so one press still leaves a sheet after a touch.
+  gv->show_focus = true;
+  redraw(gv);
+  apply_nav(gv, nav_back(&gv->nav));
 }
 
 static void select_click(ClickRecognizerRef r, void *ctx) {
   GridView *gv = ctx;
+  if (gv->has_nav) {
+    if (!reveal_focus(gv)) apply_nav(gv, nav_select(&gv->nav));
+    return;
+  }
   if (!gv->show_focus) {
     move_focus(gv, 1);
     return;
@@ -363,6 +495,7 @@ static void select_click(ClickRecognizerRef r, void *ctx) {
 
 static void select_long_click(ClickRecognizerRef r, void *ctx) {
   GridView *gv = ctx;
+  if (gv->has_nav) return;
   if (gv->show_focus && gv->focus >= 0 && gv->focus < gv->count && focusable(&gv->cells[gv->focus]) && gv->h.on_activate) {
     vibes_short_pulse();
     gv->h.on_activate(gv, gv->focus, true);
@@ -374,6 +507,9 @@ static void click_config(void *ctx) {
   window_single_click_subscribe(BUTTON_ID_DOWN, down_click);
   window_single_click_subscribe(BUTTON_ID_SELECT, select_click);
   window_long_click_subscribe(BUTTON_ID_SELECT, 500, select_long_click, NULL);
+  // Without zones Back keeps its default: pop the window.
+  GridView *gv = ctx;
+  if (gv->has_nav) window_single_click_subscribe(BUTTON_ID_BACK, back_click);
 }
 
 // ---- tick ----
@@ -414,6 +550,7 @@ static void window_disappear(Window *window) {
   GridView *gv = window_get_user_data(window);
   stop_press_timer(gv);
   gv->pressed = -1;
+  gv->strip_drag = -1;
   if (s_touch_owner == gv) {
     touch_service_unsubscribe();
     s_touch_owner = NULL;
@@ -454,6 +591,7 @@ GridView *grid_view_create(const GridHandlers *handlers, void *ctx) {
   gv->ctx = ctx;
   gv->focus = -1;
   gv->pressed = -1;
+  gv->strip_drag = -1;
   gv->pages = 1;
   touch_fsm_init(&gv->fsm);
 

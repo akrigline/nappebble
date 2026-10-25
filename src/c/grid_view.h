@@ -5,6 +5,8 @@
 #include <pebble.h>
 #include "logic/layout.h"
 #include "logic/touch_fsm.h"
+#include "logic/strip.h"
+#include "logic/nav.h"
 
 #define GRID_MAX_CELLS 20
 
@@ -15,7 +17,8 @@ typedef enum {
   CELL_BUTTON,
   CELL_CHIP,
   CELL_HEADER,
-  CELL_TEXT
+  CELL_TEXT,
+  CELL_STRIP           // horizontal slider: readout (title) on top, track below
 } CellKind;
 
 typedef struct {
@@ -30,6 +33,8 @@ typedef struct {
   uint8_t font;       // CELL_TEXT: FONT_BODY, FONT_VALUE or FONT_CLOCK
   bool has_dot;       // CELL_HEADER: status dot at the right edge
   GColor dot;
+  StripGeom geom;     // CELL_STRIP: track and value range
+  int32_t strip_value;
 } GridCell;
 
 typedef struct GridView GridView;
@@ -40,6 +45,8 @@ typedef struct {
   void (*on_tick)(GridView *gv);
   void (*on_state)(GridView *gv);                  // phone state changed
   void (*on_slider)(GridView *gv, int y);          // touch inside the slider track
+  void (*on_strip)(GridView *gv, int cell, int x); // touchdown and every move on a strip
+  void (*on_adjust)(GridView *gv, int zone, int dir);  // Up/Down on an ADJUST zone
   void (*on_unload)(GridView *gv);
 } GridHandlers;
 
@@ -64,6 +71,11 @@ struct GridView {
   bool has_slider;
   Rect slider_track;
   int slider_knob_y;
+  int strip_drag;            // strip cell being dragged, or -1
+  Nav nav;                   // zone focus for the buttons when has_nav
+  bool has_nav;
+  int zone_cell[NAV_MAX_ZONES];   // first cell of each zone
+  int zone_cells[NAV_MAX_ZONES];  // number of consecutive cells in each zone
 };
 
 GridView *grid_view_create(const GridHandlers *handlers, void *ctx);
@@ -77,6 +89,9 @@ void grid_view_commit(GridView *gv);
 
 void grid_view_set_tick(GridView *gv, int secs);
 void grid_view_focus(GridView *gv, int index);
+// Switch the buttons to zone navigation. A zone's cells are consecutive from
+// first_cell; on_activate gets the absolute cell index of a chosen item.
+void grid_view_set_zones(GridView *gv, const NavZone *zones, const int *first_cell, const int *cell_count, int count);
 
 // 1 = checkmark with `message` as its caption, 2 = error banner. `done` runs when it expires.
 void grid_view_flash(GridView *gv, int kind, const char *message, int ms, void (*done)(GridView *gv));
