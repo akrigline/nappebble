@@ -5,14 +5,14 @@
 
 void model_default(WatchState *s) {
   memset(s, 0, sizeof(*s));
-  s->units = UNITS_OZ;
+  s->bottle_units = UNITS_OZ;
+  s->pump_units = UNITS_OZ;
   static const uint8_t layout[] = {
     ACTION_DIAPER, ACTION_BOTTLE, ACTION_NURSING, ACTION_SLEEP,
     ACTION_PUMP, ACTION_POTTY, ACTION_STATUS
   };
   memcpy(s->layout, layout, sizeof(layout));
   s->layout_count = sizeof(layout);
-  for (int i = 0; i < PRESET_COUNT; i++) s->preset[i] = (i + 2) * 10;
 }
 
 // ---- timers ----
@@ -117,8 +117,10 @@ static void detail_line(const WatchState *s, int action, char *out, size_t n) {
       if (info > 0) snprintf(out, n, "%s", model_diaper_label((int)info - 1));
       break;
     case ACTION_BOTTLE:
+      if (info > 0) fmt_amount(out, n, info, s->bottle_units);
+      break;
     case ACTION_PUMP:
-      if (info > 0) fmt_amount(out, n, info, s->units);
+      if (info > 0) fmt_amount(out, n, info, s->pump_units);
       break;
     case ACTION_NURSING:
       snprintf(out, n, "%s", model_side_label((int)info));

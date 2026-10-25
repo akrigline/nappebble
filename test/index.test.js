@@ -106,9 +106,10 @@ test('on ready it syncs and sends the state to the watch using wire keys', async
   assert.equal(state.STATUS, P.STATUS.OK);
   assert.equal(state.BABY_NAME, 'Phoebe');
   assert.deepEqual(state.LAYOUT.slice(-1), [P.ACTION.STATUS]);
-  assert.equal(state[b.ids.PRESET + 1], 30, 'array keys are spread to numeric ids');
-  assert.equal(state[b.ids.LAST], 0);
-  assert.equal('PRESET' in state, false);
+  assert.equal(state[b.ids.LAST], 0, 'array keys are spread to numeric ids');
+  assert.equal('LAST' in state, false);
+  assert.equal(state.BOTTLE_UNITS, P.UNITS.OZ);
+  assert.equal(state.PUMP_UNITS, P.UNITS.OZ);
 });
 
 test('with no token on ready it reports NO_TOKEN and makes no HTTP request', async () => {
@@ -150,19 +151,20 @@ test('showConfiguration opens the Clay page with the babies and prefilled values
   assert.equal(clay.options.autoHandleEvents, false);
   assert.ok(JSON.stringify(clay.config).includes('Phoebe'));
   assert.equal(clay.settings.token, 'good-token');
-  assert.equal(clay.settings.units, 'oz');
+  assert.equal(clay.settings.bottleUnits, 'oz');
+  assert.equal(clay.settings.pumpUnits, 'oz');
 });
 
 test('webviewclosed saves the settings and syncs again', async () => {
   const b = boot({ token: '' });
   b.fire('ready', {});
   await b.settle();
-  b.fire('webviewclosed', { response: JSON.stringify({ token: { value: 'good-token' }, units: { value: 'ml' } }) });
+  b.fire('webviewclosed', { response: JSON.stringify({ token: { value: 'good-token' }, bottleUnits: { value: 'ml' } }) });
   await b.settle();
-  assert.equal(JSON.parse(b.store['nappi.settings']).units, 'ml');
+  assert.equal(JSON.parse(b.store['nappi.settings']).bottleUnits, 'ml');
   const last = b.sent.filter((d) => 'STATUS' in d).pop();
   assert.equal(last.STATUS, P.STATUS.OK);
-  assert.equal(last.UNITS, P.UNITS.ML);
+  assert.equal(last.BOTTLE_UNITS, P.UNITS.ML);
   assert.ok(!JSON.stringify(b.sent).includes('good-token'), 'token never reaches the watch');
 });
 

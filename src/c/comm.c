@@ -82,7 +82,8 @@ static void apply_state(DictionaryIterator *it) {
 
   if (read_int(it, MESSAGE_KEY_STATUS, &v)) s->status = (uint8_t)v;
   s->retry_after = read_int(it, MESSAGE_KEY_RETRY_AFTER, &v) ? v : 0;
-  if (read_int(it, MESSAGE_KEY_UNITS, &v)) s->units = (uint8_t)v;
+  if (read_int(it, MESSAGE_KEY_BOTTLE_UNITS, &v)) s->bottle_units = (uint8_t)v;
+  if (read_int(it, MESSAGE_KEY_PUMP_UNITS, &v)) s->pump_units = (uint8_t)v;
   if (read_int(it, MESSAGE_KEY_EXIT_AFTER_LOG, &v)) s->exit_after_log = v != 0;
   if (read_int(it, MESSAGE_KEY_DEFAULT_BOTTLE, &v)) s->default_bottle = (uint8_t)v;
 
@@ -111,7 +112,6 @@ static void apply_state(DictionaryIterator *it) {
     s->layout_count = (uint8_t)n;
   }
 
-  read_array(it, MESSAGE_KEY_PRESET, s->preset, PRESET_COUNT);
   read_array(it, MESSAGE_KEY_LAST, s->last, ACTION_COUNT);
   read_array(it, MESSAGE_KEY_INFO, s->info, ACTION_COUNT);
   read_array(it, MESSAGE_KEY_TIMER_ELAPSED, s->timer_elapsed, TIMER_COUNT);

@@ -4,7 +4,7 @@ const { jobsFor, BadCommand } = require('../src/pkjs/commands');
 const P = require('../src/pkjs/protocol');
 
 const NOW = Date.parse('2026-10-24T19:00:00Z');
-const ctx = { babyId: 'baby-1', units: 'oz', now: NOW, offsetAt: () => -240 };
+const ctx = { babyId: 'baby-1', bottleUnits: 'oz', pumpUnits: 'oz', now: NOW, offsetAt: () => -240 };
 
 function one(dict, over) {
   const jobs = jobsFor(dict, Object.assign({}, ctx, over));
@@ -34,9 +34,18 @@ test('a bottle sends amount in the user units, with the unit named', () => {
 });
 
 test('bottle amounts follow the ml setting and keep one decimal', () => {
-  const job = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 1250, ARG2: P.BOTTLE_TYPE.FORMULA, ARG3: 0 }, { units: 'ml' });
+  const job = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 1250, ARG2: P.BOTTLE_TYPE.FORMULA, ARG3: 0 }, { bottleUnits: 'ml' });
   assert.deepEqual(job.body, { type: 'bottle', amount: 125, unit: 'ml', bottle_type: 'formula' });
   assert.equal(one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 25, ARG2: 0, ARG3: 0 }).body.amount, 2.5);
+});
+
+test('a bottle uses the bottle units and a pump stop uses the pump units', () => {
+  const bottle = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 40, ARG2: 0, ARG3: 0 }, { bottleUnits: 'oz', pumpUnits: 'ml' });
+  assert.equal(bottle.body.amount, 4);
+  assert.equal(bottle.body.unit, 'oz');
+  const pump = one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 1200 }, { bottleUnits: 'oz', pumpUnits: 'ml' });
+  assert.equal(pump.body.amount, 120);
+  assert.equal(pump.body.unit, 'ml');
 });
 
 test('a backdated bottle carries time as well', () => {

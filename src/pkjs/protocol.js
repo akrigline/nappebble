@@ -26,12 +26,13 @@ const ACTION = Object.freeze({
 
 // Watch -> phone commands (CMD key, with ARG1..ARG4 and a CMD_ID echoed in the ACK).
 //   LOG_DIAPER    ARG1 DIAPER_*, ARG2 minutes ago
-//   LOG_BOTTLE    ARG1 amount x10 (in the current UNITS), ARG2 BOTTLE_TYPE_*, ARG3 minutes ago
+//   LOG_BOTTLE    ARG1 amount x10 (in the bottle screen's units), ARG2 BOTTLE_TYPE_*, ARG3 minutes ago
 //   LOG_POTTY     ARG1 POTTY_*, ARG2 minutes ago
 //   TIMER_START   ARG1 TIMER_*, ARG2 SIDE_*, ARG3 minutes ago
-//   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (0 none)
+//   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (in the pump screen's units, 0 none)
 //   TIMER_SWITCH  ARG1 new SIDE_* (stop the nursing timer, start the other side)
 //   SWITCH_BABY   ARG1 baby index
+//   SET_UNITS     ARG1 UNITS_SCREEN_*, ARG2 UNITS_* (the unit that screen shows and logs in)
 const CMD = Object.freeze({
   REFRESH: 1,
   LOG_DIAPER: 2,
@@ -42,6 +43,7 @@ const CMD = Object.freeze({
   TIMER_STOP: 7,
   SWITCH_BABY: 8,
   TIMER_SWITCH: 9,
+  SET_UNITS: 10,
 });
 
 const DIAPER = Object.freeze({ WET: 0, POO: 1, MIXED: 2, DRY: 3 });
@@ -61,8 +63,7 @@ const TIMER_STATE = Object.freeze({ NONE: 0, RUNNING: 1, PAUSED: 2 });
 
 const SIDE = Object.freeze({ NONE: 0, LEFT: 1, RIGHT: 2, BOTH: 3 });
 const UNITS = Object.freeze({ OZ: 0, ML: 1 });
-
-const PRESET_COUNT = 6;
+const UNITS_SCREEN = Object.freeze({ BOTTLE: 0, PUMP: 1 });
 
 // Canonical AppMessage key list; package.json must match (see protocol-sync test).
 // "NAME[n]" declares n consecutive keys, MESSAGE_KEY_NAME + i on the watch.
@@ -71,9 +72,8 @@ const MESSAGE_KEYS = [
   'CMD', 'CMD_ID', 'ARG1', 'ARG2', 'ARG3', 'ARG4',
   'ACK_ID', 'ACK_STATUS',
   'BABY_COUNT', 'BABY_INDEX', 'BABY_NAMES', 'BABY_ACCENT', 'OTHER_TIMERS',
-  'UNITS', 'EXIT_AFTER_LOG', 'DEFAULT_BOTTLE',
+  'BOTTLE_UNITS', 'PUMP_UNITS', 'EXIT_AFTER_LOG', 'DEFAULT_BOTTLE',
   'LAYOUT',
-  'PRESET[' + PRESET_COUNT + ']',
   'LAST[' + Object.keys(ACTION).length + ']',
   'INFO[' + Object.keys(ACTION).length + ']',
   'TIMER_STATE[' + Object.keys(TIMER).length + ']',
@@ -116,5 +116,5 @@ function describeError(err) {
 module.exports = {
   STATUS, statusMessage, describeError,
   ACTION, CMD, DIAPER, DIAPER_TYPES, BOTTLE_TYPE, BOTTLE_TYPES, POTTY, POTTY_OUTCOMES,
-  TIMER, TIMER_TYPES, TIMER_STATE, SIDE, UNITS, PRESET_COUNT, MESSAGE_KEYS,
+  TIMER, TIMER_TYPES, TIMER_STATE, SIDE, UNITS, UNITS_SCREEN, MESSAGE_KEYS,
 };

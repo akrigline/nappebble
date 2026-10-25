@@ -1,6 +1,6 @@
 // Turns the logical state dict into what Pebble.sendAppMessage takes.
 //
-// Array-declared keys ("PRESET[6]" in package.json) are consecutive numeric
+// Array-declared keys ("LAST[7]" in package.json) are consecutive numeric
 // keys, so an array value for one is spread out as ids[NAME] + i. Anything
 // else passes through by name; a plain array (LAYOUT) goes as a byte array.
 // `ids` is require('message_keys') on the phone, a fake in tests.

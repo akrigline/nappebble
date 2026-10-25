@@ -2,7 +2,7 @@
 // what comes back. Everything stays on the phone; nothing here is sent to
 // the watch.
 
-const { DEFAULTS, DEFAULT_PRESETS } = require('./settings');
+const { DEFAULTS } = require('./settings');
 const { resolveActiveBaby } = require('./babies');
 
 const NO_BABIES_HINT = 'Enter your API token and save, then reopen these settings to choose a baby. ' +
@@ -15,7 +15,11 @@ const ACTION_LABELS = {
 };
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const BOTTLE_TYPES = ['formula', 'breast_milk'];
-const MAX_PRESET = 1000;
+
+const UNIT_OPTIONS = [
+  { label: 'Ounces (oz)', value: 'oz' },
+  { label: 'Millilitres (ml)', value: 'ml' }
+];
 
 function positionOptions() {
   const options = [{ label: 'Hidden', value: '0' }];
@@ -53,13 +57,17 @@ function buildConfig(options) {
 
   items.push({
     type: 'select',
-    messageKey: 'units',
-    label: 'Units',
-    defaultValue: settings.units,
-    options: [
-      { label: 'Ounces (oz)', value: 'oz' },
-      { label: 'Millilitres (ml)', value: 'ml' }
-    ]
+    messageKey: 'bottleUnits',
+    label: 'Bottle units',
+    defaultValue: settings.bottleUnits,
+    options: UNIT_OPTIONS
+  });
+  items.push({
+    type: 'select',
+    messageKey: 'pumpUnits',
+    label: 'Pump units',
+    defaultValue: settings.pumpUnits,
+    options: UNIT_OPTIONS
   });
 
   items.push({
@@ -83,14 +91,6 @@ function buildConfig(options) {
     type: 'section',
     items: [
       { type: 'heading', defaultValue: 'Bottles' },
-      {
-        type: 'input',
-        messageKey: 'bottlePresets',
-        label: 'Preset amounts',
-        description: 'Up to six amounts separated by commas, in the unit chosen above. Leave blank for ' +
-          DEFAULT_PRESETS[settings.units].join(', ') + '.',
-        defaultValue: settings.bottlePresets.join(', ')
-      },
       {
         type: 'select',
         messageKey: 'defaultBottleType',
@@ -162,13 +162,6 @@ function layoutFrom(response) {
   return placed.map((p) => p.action);
 }
 
-function presetsFrom(text) {
-  return String(text).split(/[\s,]+/)
-    .map(Number)
-    .filter((n) => Number.isFinite(n) && n > 0 && n <= MAX_PRESET)
-    .slice(0, 6);
-}
-
 function settingsFromClayResponse(response) {
   const patch = {};
   const token = plain(response.token);
@@ -177,8 +170,10 @@ function settingsFromClayResponse(response) {
   const babyId = plain(response.babyId);
   if (typeof babyId === 'string' && babyId) patch.babyId = babyId;
 
-  const units = plain(response.units);
-  if (units === 'oz' || units === 'ml') patch.units = units;
+  ['bottleUnits', 'pumpUnits'].forEach((name) => {
+    const units = plain(response[name]);
+    if (units === 'oz' || units === 'ml') patch[name] = units;
+  });
 
   const baseUrl = plain(response.baseUrl);
   if (typeof baseUrl === 'string') {
@@ -187,9 +182,6 @@ function settingsFromClayResponse(response) {
 
   const layout = layoutFrom(response);
   if (layout) patch.layout = layout;
-
-  const presets = plain(response.bottlePresets);
-  if (presets !== undefined) patch.bottlePresets = presetsFrom(presets);
 
   const bottleType = plain(response.defaultBottleType);
   if (BOTTLE_TYPES.indexOf(bottleType) >= 0) patch.defaultBottleType = bottleType;

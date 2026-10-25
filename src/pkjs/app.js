@@ -249,7 +249,9 @@ function createApp(deps) {
     const now = deps.now();
     let jobs;
     try {
-      jobs = jobsFor(dict, { babyId: baby.id, units: s.units, now, offsetAt: deps.offsetAt });
+      jobs = jobsFor(dict, {
+        babyId: baby.id, bottleUnits: s.bottleUnits, pumpUnits: s.pumpUnits, now, offsetAt: deps.offsetAt
+      });
     } catch (e) {
       if (e instanceof BadCommand) {
         log('bad command: ' + e.message);
@@ -263,7 +265,7 @@ function createApp(deps) {
       const per = perBaby(job.babyId);
       per.timers = rolledTimers(per, now);
       per.timersAt = now;
-      const view = applyJob({ latest: per.latest, timers: per.timers }, job, { now, units: s.units });
+      const view = applyJob({ latest: per.latest, timers: per.timers }, job, { now });
       per.latest = view.latest;
       per.timers = view.timers;
     });
@@ -280,10 +282,29 @@ function createApp(deps) {
     return sent;
   }
 
+  // The watch's unit toggle on an amount screen. Both args are checked before
+  // anything is saved; queued writes already carry the unit they were logged in.
+  function setUnits(dict) {
+    let field = null;
+    if (dict.ARG1 === P.UNITS_SCREEN.BOTTLE) field = 'bottleUnits';
+    else if (dict.ARG1 === P.UNITS_SCREEN.PUMP) field = 'pumpUnits';
+    let unit = null;
+    if (dict.ARG2 === P.UNITS.OZ) unit = 'oz';
+    else if (dict.ARG2 === P.UNITS.ML) unit = 'ml';
+    if (!field || !unit) {
+      log('bad SET_UNITS: ' + dict.ARG1 + ', ' + dict.ARG2);
+      return ack(dict, STATUS.ERROR);
+    }
+    settings.update({ [field]: unit });
+    ack(dict, STATUS.OK);
+    return sendState();
+  }
+
   function onMessage(dict) {
     switch (dict.CMD) {
       case P.CMD.REFRESH: return refresh({ force: false });
       case P.CMD.SWITCH_BABY: return switchBaby(dict.ARG1);
+      case P.CMD.SET_UNITS: return setUnits(dict);
       default: return write(dict);
     }
   }

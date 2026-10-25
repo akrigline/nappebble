@@ -21,19 +21,19 @@ test('scalar values pass through by name', () => {
 
 test('array-declared keys expand to consecutive numeric keys', () => {
   const ids = fakeIds();
-  const wire = toWire({ PRESET: [20, 30, 40, 50, 60, 70] }, ids);
-  assert.deepEqual(Object.keys(wire).map(Number), [0, 1, 2, 3, 4, 5].map((i) => ids.PRESET + i));
-  assert.equal(wire[ids.PRESET + 2], 40);
+  const wire = toWire({ INFO: [20, 30, 40, 50, 60, 70, 80] }, ids);
+  assert.deepEqual(Object.keys(wire).map(Number), [0, 1, 2, 3, 4, 5, 6].map((i) => ids.INFO + i));
+  assert.equal(wire[ids.INFO + 2], 40);
 });
 
 test('every array key in the protocol expands with the declared length', () => {
   const ids = fakeIds();
   const dict = {
-    PRESET: new Array(6).fill(1), LAST: new Array(7).fill(2), INFO: new Array(7).fill(3),
+    LAST: new Array(7).fill(2), INFO: new Array(7).fill(3),
     TIMER_STATE: [0, 0, 0], TIMER_ELAPSED: [0, 0, 0], TIMER_SIDE: [0, 0, 0],
   };
   const wire = toWire(dict, ids);
-  assert.equal(Object.keys(wire).length, 6 + 7 + 7 + 3 + 3 + 3);
+  assert.equal(Object.keys(wire).length, 7 + 7 + 3 + 3 + 3);
 });
 
 test('LAYOUT is a single byte-array value, not expanded', () => {
@@ -41,7 +41,7 @@ test('LAYOUT is a single byte-array value, not expanded', () => {
 });
 
 test('an array longer than its declaration is an error, not silent corruption', () => {
-  assert.throws(() => toWire({ PRESET: new Array(7).fill(1) }, fakeIds()), /PRESET/);
+  assert.throws(() => toWire({ INFO: new Array(8).fill(1) }, fakeIds()), /INFO/);
 });
 
 test('a shorter array fills only the leading slots', () => {

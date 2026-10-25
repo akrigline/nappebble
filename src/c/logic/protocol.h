@@ -30,6 +30,7 @@
 #define CMD_TIMER_STOP 7
 #define CMD_SWITCH_BABY 8
 #define CMD_TIMER_SWITCH 9
+#define CMD_SET_UNITS 10
 
 #define DIAPER_WET 0
 #define DIAPER_POO 1
@@ -64,6 +65,8 @@
 #define UNITS_OZ 0
 #define UNITS_ML 1
 
-#define PRESET_COUNT 6
+#define UNITS_SCREEN_BOTTLE 0
+#define UNITS_SCREEN_PUMP 1
+
 #define ACTION_COUNT 7
 #define TIMER_COUNT 3

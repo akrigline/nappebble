@@ -3,7 +3,7 @@
 // the real data. Pure: returns a new view, never mutates the one it is given.
 //
 // view: { latest: { diaper: {...}, ... }, timers: [...] }  (API shapes)
-// ctx:  { now (epoch ms), units: 'oz' | 'ml' }
+// ctx:  { now (epoch ms) }  (amounts carry their own unit in the job body)
 
 const { toIsoZ } = require('./time');
 

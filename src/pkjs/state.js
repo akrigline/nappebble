@@ -5,7 +5,6 @@
 //         othersRunning, settings, pending, now }
 
 const P = require('./protocol');
-const { DEFAULT_PRESETS } = require('./settings');
 
 const ACCENTS = 6;
 const OZ_ML = 29.5735;
@@ -21,13 +20,6 @@ function layoutIds(names) {
   return ids;
 }
 
-function presetsFor(settings) {
-  const chosen = settings.bottlePresets.length ? settings.bottlePresets : DEFAULT_PRESETS[settings.units];
-  const slots = chosen.slice(0, P.PRESET_COUNT).map((n) => Math.round(n * 10));
-  while (slots.length < P.PRESET_COUNT) slots.push(0);
-  return slots;
-}
-
 const seconds = (iso) => Math.floor(Date.parse(iso) / 1000);
 
 function amountX10(ml, units) {
@@ -41,8 +33,9 @@ function sideId(side) {
   return P.SIDE.NONE;
 }
 
-// [last, info] for one action, from the API's latest-entry shapes.
-function summarise(action, latest, units) {
+// [last, info] for one action, from the API's latest-entry shapes. `s` is the
+// settings: bottle and pump amounts each use their own screen's unit.
+function summarise(action, latest, s) {
   switch (action) {
     case P.ACTION.DIAPER: {
       const e = latest.diaper;
@@ -50,7 +43,7 @@ function summarise(action, latest, units) {
     }
     case P.ACTION.BOTTLE: {
       const e = latest.bottle;
-      return e ? [seconds(e.time), amountX10(e.amount_ml, units)] : [0, 0];
+      return e ? [seconds(e.time), amountX10(e.amount_ml, s.bottleUnits)] : [0, 0];
     }
     case P.ACTION.NURSING: {
       const e = latest.nursing;
@@ -62,7 +55,7 @@ function summarise(action, latest, units) {
     }
     case P.ACTION.PUMP: {
       const e = latest.pumping;
-      return e ? [seconds(e.time), amountX10(e.total_amount_ml, units)] : [0, 0];
+      return e ? [seconds(e.time), amountX10(e.total_amount_ml, s.pumpUnits)] : [0, 0];
     }
     case P.ACTION.POTTY: {
       const e = latest.potty;
@@ -77,7 +70,8 @@ function buildState(view) {
   const s = view.settings;
   const state = {
     STATUS: view.status,
-    UNITS: s.units === 'ml' ? P.UNITS.ML : P.UNITS.OZ,
+    BOTTLE_UNITS: s.bottleUnits === 'ml' ? P.UNITS.ML : P.UNITS.OZ,
+    PUMP_UNITS: s.pumpUnits === 'ml' ? P.UNITS.ML : P.UNITS.OZ,
     EXIT_AFTER_LOG: s.exitAfterLog ? 1 : 0,
     DEFAULT_BOTTLE: Math.max(0, P.BOTTLE_TYPES.indexOf(s.defaultBottleType))
   };
@@ -93,13 +87,12 @@ function buildState(view) {
   state.BABY_ACCENT = view.activeIndex % ACCENTS;
   state.OTHER_TIMERS = view.othersRunning ? 1 : 0;
   state.LAYOUT = layoutIds(s.layout);
-  state.PRESET = presetsFor(s);
   state.PENDING = view.pending;
 
   state.LAST = [];
   state.INFO = [];
   Object.keys(P.ACTION).forEach((name) => {
-    const pair = summarise(P.ACTION[name], view.latest, s.units);
+    const pair = summarise(P.ACTION[name], view.latest, s);
     state.LAST[P.ACTION[name]] = pair[0];
     state.INFO[P.ACTION[name]] = pair[1];
   });
@@ -118,4 +111,4 @@ function buildState(view) {
   return state;
 }
 
-module.exports = { buildState, layoutIds, presetsFor };
+module.exports = { buildState, layoutIds };

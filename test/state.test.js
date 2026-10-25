@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildState, layoutIds, presetsFor } = require('../src/pkjs/state');
+const { buildState, layoutIds } = require('../src/pkjs/state');
 const { DEFAULTS } = require('../src/pkjs/settings');
 const P = require('../src/pkjs/protocol');
 
@@ -49,11 +49,13 @@ test('status is always present, and RETRY_AFTER only when given', () => {
 });
 
 test('settings are echoed as small ints', () => {
-  const s = buildState(view({ settings: Object.assign({}, DEFAULTS, { units: 'ml', exitAfterLog: true, defaultBottleType: 'breast_milk' }) }));
-  assert.equal(s.UNITS, P.UNITS.ML);
+  const s = buildState(view({ settings: Object.assign({}, DEFAULTS, { bottleUnits: 'ml', pumpUnits: 'oz', exitAfterLog: true, defaultBottleType: 'breast_milk' }) }));
+  assert.equal(s.BOTTLE_UNITS, P.UNITS.ML);
+  assert.equal(s.PUMP_UNITS, P.UNITS.OZ);
   assert.equal(s.EXIT_AFTER_LOG, 1);
   assert.equal(s.DEFAULT_BOTTLE, P.BOTTLE_TYPE.BREAST_MILK);
-  assert.equal(buildState(view()).UNITS, P.UNITS.OZ);
+  assert.equal(buildState(view()).BOTTLE_UNITS, P.UNITS.OZ);
+  assert.equal(buildState(view()).PUMP_UNITS, P.UNITS.OZ);
   assert.equal(buildState(view()).EXIT_AFTER_LOG, 0);
 });
 
@@ -68,16 +70,6 @@ test('layoutIds honours order and visibility, drops unknown names and duplicates
   assert.deepEqual(layoutIds(['diaper', 'activity', 'bottle']), [P.ACTION.DIAPER, P.ACTION.BOTTLE, P.ACTION.STATUS]);
   assert.deepEqual(layoutIds([]), [P.ACTION.STATUS]);
   assert.deepEqual(layoutIds(['status', 'diaper']), [P.ACTION.DIAPER, P.ACTION.STATUS]);
-});
-
-test('presets default per unit, as amount x10 padded to six slots', () => {
-  assert.deepEqual(presetsFor(DEFAULTS), [20, 30, 40, 50, 60, 70]);
-  assert.deepEqual(presetsFor(Object.assign({}, DEFAULTS, { units: 'ml' })), [600, 900, 1200, 1500, 1800, 2100]);
-});
-
-test('custom presets are used, kept to six, and padded with zeros', () => {
-  assert.deepEqual(presetsFor(Object.assign({}, DEFAULTS, { bottlePresets: [2.5, 5] })), [25, 50, 0, 0, 0, 0]);
-  assert.deepEqual(presetsFor(Object.assign({}, DEFAULTS, { bottlePresets: [1, 2, 3, 4, 5, 6, 7, 8] })), [10, 20, 30, 40, 50, 60]);
 });
 
 test('LAST holds epoch seconds per action, 0 when there is nothing', () => {
@@ -119,12 +111,20 @@ test('INFO carries the small detail each tile shows', () => {
   assert.equal(s.INFO.length, 7);
 });
 
-test('INFO bottle amount follows the unit setting', () => {
+test('INFO bottle and pump amounts follow their own screen units', () => {
   const s = buildState(view({
-    settings: Object.assign({}, DEFAULTS, { units: 'ml' }),
-    latest: { bottle: { id: '2', time: '2026-10-24T16:00:00Z', amount_ml: 120, bottle_type: 'formula' } },
+    settings: Object.assign({}, DEFAULTS, { bottleUnits: 'oz', pumpUnits: 'ml' }),
+    latest: {
+      bottle: { id: '2', time: '2026-10-24T16:00:00Z', amount_ml: 118.3, bottle_type: 'formula' },
+      pumping: { id: '5', time: '2026-10-24T13:00:00Z', duration_minutes: 15, total_amount_ml: 120, left_amount_ml: null, right_amount_ml: null },
+    },
   }));
-  assert.equal(s.INFO[P.ACTION.BOTTLE], 1200);
+  assert.equal(s.INFO[P.ACTION.BOTTLE], 40);
+  assert.equal(s.INFO[P.ACTION.PUMP], 1200);
+  assert.equal(s.BOTTLE_UNITS, 0);
+  assert.equal(s.PUMP_UNITS, 1);
+  assert.equal('PRESET' in s, false);
+  assert.equal('UNITS' in s, false);
 });
 
 test('timers: none running gives zeros', () => {
@@ -156,7 +156,7 @@ test('with no baby known, only status and settings are sent', () => {
   assert.equal(s.STATUS, P.STATUS.NO_TOKEN);
   assert.equal('BABY_NAME' in s, false);
   assert.equal('LAST' in s, false);
-  assert.equal(s.UNITS, P.UNITS.OZ);
+  assert.equal(s.BOTTLE_UNITS, P.UNITS.OZ);
 });
 
 test('every key in a built state is a declared message key', () => {

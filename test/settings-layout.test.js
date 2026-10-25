@@ -14,9 +14,8 @@ const byKey = (config, key) => {
   return found;
 };
 
-test('new settings default to spec layout, no custom presets, formula, stay-open', () => {
+test('new settings default to spec layout, formula, stay-open', () => {
   assert.deepEqual(DEFAULTS.layout, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']);
-  assert.deepEqual(DEFAULTS.bottlePresets, []);
   assert.equal(DEFAULTS.defaultBottleType, 'formula');
   assert.equal(DEFAULTS.exitAfterLog, false);
 });
@@ -27,12 +26,11 @@ test('arrays in settings are copied on read so callers cannot corrupt the store'
   assert.deepEqual(store.get().layout, DEFAULTS.layout);
 });
 
-test('layout and presets persist', () => {
+test('layout persists', () => {
   const storage = memoryStorage();
-  createSettings(storage).update({ layout: ['sleep', 'diaper'], bottlePresets: [3, 4] });
+  createSettings(storage).update({ layout: ['sleep', 'diaper'] });
   const s = createSettings(storage).get();
   assert.deepEqual(s.layout, ['sleep', 'diaper']);
-  assert.deepEqual(s.bottlePresets, [3, 4]);
 });
 
 test('the config page has a position picker per action, prefilled from the saved layout', () => {
@@ -47,23 +45,15 @@ test('the config page has a position picker per action, prefilled from the saved
   assert.equal(labels.length, 7);
 });
 
-test('the config page has presets, default bottle type and exit-after-log', () => {
+test('the config page has default bottle type and exit-after-log, and no presets', () => {
   const config = buildConfig({
-    settings: Object.assign({}, DEFAULTS, { bottlePresets: [2.5, 5], defaultBottleType: 'breast_milk', exitAfterLog: true }), babies: [],
+    settings: Object.assign({}, DEFAULTS, { defaultBottleType: 'breast_milk', exitAfterLog: true }), babies: [],
   });
-  assert.equal(byKey(config, 'bottlePresets').defaultValue, '2.5, 5');
+  assert.equal(byKey(config, 'bottlePresets'), undefined);
   assert.equal(byKey(config, 'defaultBottleType').defaultValue, 'breast_milk');
   assert.deepEqual(byKey(config, 'defaultBottleType').options.map((o) => o.value), ['formula', 'breast_milk']);
   assert.equal(byKey(config, 'exitAfterLog').type, 'toggle');
   assert.equal(byKey(config, 'exitAfterLog').defaultValue, true);
-});
-
-test('blank custom presets show the unit defaults as a hint, not as saved values', () => {
-  const config = buildConfig({ settings: DEFAULTS, babies: [] });
-  assert.equal(byKey(config, 'bottlePresets').defaultValue, '');
-  assert.match(byKey(config, 'bottlePresets').description, /2, 3, 4, 5, 6, 7/);
-  const ml = buildConfig({ settings: Object.assign({}, DEFAULTS, { units: 'ml' }), babies: [] });
-  assert.match(byKey(ml, 'bottlePresets').description, /60, 90, 120/);
 });
 
 test('positions in the response become the ordered layout, hidden ones dropped', () => {
@@ -96,15 +86,8 @@ test('a response with no position fields leaves the layout alone', () => {
   assert.equal('layout' in settingsFromClayResponse({ token: { value: 't' } }), false);
 });
 
-test('presets parse from comma or space separated text, capped at six', () => {
-  assert.deepEqual(settingsFromClayResponse({ bottlePresets: { value: '2, 3.5 ,4  5,6,7,8' } }).bottlePresets, [2, 3.5, 4, 5, 6, 7]);
-});
-
-test('bad or empty presets fall back to the defaults (empty list)', () => {
-  assert.deepEqual(settingsFromClayResponse({ bottlePresets: { value: '' } }).bottlePresets, []);
-  assert.deepEqual(settingsFromClayResponse({ bottlePresets: { value: 'lots' } }).bottlePresets, []);
-  assert.deepEqual(settingsFromClayResponse({ bottlePresets: { value: '-3, 0, 2' } }).bottlePresets, [2]);
-  assert.deepEqual(settingsFromClayResponse({ bottlePresets: { value: '5000, 4' } }).bottlePresets, [4]);
+test('a preset response field is ignored', () => {
+  assert.equal('bottlePresets' in settingsFromClayResponse({ bottlePresets: { value: '2, 3' } }), false);
 });
 
 test('default bottle type and exit-after-log are validated and coerced', () => {
@@ -119,5 +102,5 @@ test('prefill covers the new fields', () => {
   assert.equal(p.pos_sleep, '1');
   assert.equal(p.pos_diaper, '0');
   assert.equal(p.exitAfterLog, false);
-  assert.equal(p.bottlePresets, '');
+  assert.equal('bottlePresets' in p, false);
 });

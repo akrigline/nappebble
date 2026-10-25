@@ -12,6 +12,9 @@
 #define CHIP_H 28
 #define CONTENT_Y 58
 
+// Temporary: the fixed amount buttons until the slider sheets replace them.
+#define PRESET_COUNT 6
+
 typedef struct {
   int action;               // lockout key
   bool backdate;
@@ -184,6 +187,15 @@ void sheet_timer_start(int action, bool backdate) {
 // ---- amount slider (custom bottle amount, or pump amount) ----
 
 enum { MODE_BOTTLE = 0, MODE_PUMP = 1 };
+
+static int units_for(const WatchState *s, int action) {
+  return action == ACTION_PUMP ? s->pump_units : s->bottle_units;
+}
+
+// Fixed stand-in amounts (x10 of the display unit): 2..7 oz or 60..210 ml.
+static int32_t stand_in_amount(int units, int k) {
+  return (k + 2) * (units == UNITS_ML ? 300 : 10);
+}
 #define AMOUNT_TEXT 1
 #define AMOUNT_MINUS 2
 #define AMOUNT_PLUS 3
@@ -191,7 +203,7 @@ enum { MODE_BOTTLE = 0, MODE_PUMP = 1 };
 
 static void amount_refresh(GridView *gv) {
   SheetCtx *c = ctx_of(gv);
-  fmt_amount(gv->cells[AMOUNT_TEXT].l1, sizeof(gv->cells[AMOUNT_TEXT].l1), c->value, comm_state()->units);
+  fmt_amount(gv->cells[AMOUNT_TEXT].l1, sizeof(gv->cells[AMOUNT_TEXT].l1), c->value, units_for(comm_state(), c->action));
   gv->slider_knob_y = slider_y_for(&c->geom, c->value);
   grid_view_commit(gv);
 }
@@ -212,7 +224,7 @@ static void amount_activate(GridView *gv, int index, bool long_press) {
   if (index != AMOUNT_LOG) return;
 
   char what[24];
-  fmt_amount(what, sizeof(what), c->value, comm_state()->units);
+  fmt_amount(what, sizeof(what), c->value, units_for(comm_state(), c->action));
   if (c->mode == MODE_BOTTLE) {
     ui_send(ACTION_BOTTLE, what, CMD_LOG_BOTTLE, c->value, c->bottle_type, c->minutes, 0);
   } else {
@@ -228,10 +240,10 @@ static void open_amount(int mode, int bottle_type, int minutes) {
   c->action = mode == MODE_BOTTLE ? ACTION_BOTTLE : ACTION_PUMP;
   c->bottle_type = bottle_type;
   c->minutes = minutes;
-  bool oz = s->units == UNITS_OZ;
+  bool oz = units_for(s, c->action) == UNITS_OZ;
   int32_t max = mode == MODE_PUMP ? (oz ? 200 : 6000) : (oz ? 120 : 3600);
   c->geom = (SliderGeom){ 36, 184, oz ? 5 : 100, max, oz ? 5 : 50 };
-  c->value = s->preset[2] > 0 ? s->preset[2] : (oz ? 40 : 1200);
+  c->value = stand_in_amount(units_for(s, c->action), 2);
 
   GridHandlers h = { .on_activate = amount_activate, .on_slider = amount_on_slider, .on_unload = free_ctx };
   GridView *gv = grid_view_create(&h, c);
@@ -271,10 +283,11 @@ static void bottle_activate(GridView *gv, int index, bool long_press) {
     open_amount(MODE_BOTTLE, c->bottle_type, minutes_ago(c));
     return;
   }
-  if (k < 0 || k >= PRESET_COUNT || s->preset[k] <= 0) return;
+  if (k < 0 || k >= PRESET_COUNT) return;
+  int32_t amount = stand_in_amount(s->bottle_units, k);
   char what[24];
-  fmt_amount(what, sizeof(what), s->preset[k], s->units);
-  ui_send(ACTION_BOTTLE, what, CMD_LOG_BOTTLE, s->preset[k], c->bottle_type, minutes_ago(c), 0);
+  fmt_amount(what, sizeof(what), amount, s->bottle_units);
+  ui_send(ACTION_BOTTLE, what, CMD_LOG_BOTTLE, amount, c->bottle_type, minutes_ago(c), 0);
 }
 
 void sheet_bottle(bool backdate) {
@@ -297,10 +310,9 @@ void sheet_bottle(bool backdate) {
   Rect grid[6];
   layout_grid((Rect){ 2, 86, SCREEN_W - 4, 98 }, 3, 2, 4, grid);
   for (int i = 0; i < PRESET_COUNT; i++) {
-    char label[16] = "";
-    if (s->preset[i] > 0) fmt_amount(label, sizeof(label), s->preset[i], s->units);
-    GridCell *cell = grid_view_add(gv, CELL_BUTTON, grid[i], label, "", "", ui_action_color(ACTION_BOTTLE));
-    cell->enabled = s->preset[i] > 0;
+    char label[16];
+    fmt_amount(label, sizeof(label), stand_in_amount(s->bottle_units, i), s->bottle_units);
+    grid_view_add(gv, CELL_BUTTON, grid[i], label, "", "", ui_action_color(ACTION_BOTTLE));
   }
   grid_view_add(gv, CELL_BUTTON, (Rect){ 2, 188, SCREEN_W - 4, 36 }, "Custom", "", "", GColorLightGray);
   show_sheet(gv);
@@ -313,10 +325,10 @@ static void pump_amount_activate(GridView *gv, int index, bool long_press) {
   const WatchState *s = comm_state();
   int k = index - c->btn_first;
   if (k >= 0 && k < PRESET_COUNT) {
-    if (s->preset[k] <= 0) return;
+    int32_t amount = stand_in_amount(s->pump_units, k);
     char what[24];
-    fmt_amount(what, sizeof(what), s->preset[k], s->units);
-    ui_send(ACTION_PUMP, what, CMD_TIMER_STOP, TIMER_PUMPING, 0, s->preset[k], 0);
+    fmt_amount(what, sizeof(what), amount, s->pump_units);
+    ui_send(ACTION_PUMP, what, CMD_TIMER_STOP, TIMER_PUMPING, 0, amount, 0);
   } else if (k == PRESET_COUNT) {
     open_amount(MODE_PUMP, 0, 0);
   } else if (k == PRESET_COUNT + 1) {
@@ -333,9 +345,9 @@ void sheet_pump_amount(void) {
   Rect grid[6];
   layout_grid((Rect){ 2, 30, SCREEN_W - 4, 100 }, 3, 2, 4, grid);
   for (int i = 0; i < PRESET_COUNT; i++) {
-    char label[16] = "";
-    if (s->preset[i] > 0) fmt_amount(label, sizeof(label), s->preset[i], s->units);
-    grid_view_add(gv, CELL_BUTTON, grid[i], label, "", "", ui_action_color(ACTION_PUMP))->enabled = s->preset[i] > 0;
+    char label[16];
+    fmt_amount(label, sizeof(label), stand_in_amount(s->pump_units, i), s->pump_units);
+    grid_view_add(gv, CELL_BUTTON, grid[i], label, "", "", ui_action_color(ACTION_PUMP));
   }
   grid_view_add(gv, CELL_BUTTON, (Rect){ 2, 136, SCREEN_W - 4, 40 }, "Custom", "", "", GColorLightGray);
   grid_view_add(gv, CELL_BUTTON, (Rect){ 2, 180, SCREEN_W - 4, 44 }, "Skip amount", "", "", GColorLightGray);

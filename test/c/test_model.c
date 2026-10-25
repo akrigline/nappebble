@@ -15,13 +15,12 @@ TEST(default_state_has_no_data_and_the_spec_layout) {
   WatchState s;
   model_default(&s);
   CHECK(!s.has_data);
-  CHECK_INT(s.units, UNITS_OZ);
+  CHECK_INT(s.bottle_units, UNITS_OZ);
+  CHECK_INT(s.pump_units, UNITS_OZ);
   CHECK_INT(ACTION_COUNT, 7);
   CHECK_INT(s.layout_count, 7);
   CHECK_INT(s.layout[0], ACTION_DIAPER);
   CHECK_INT(s.layout[6], ACTION_STATUS);
-  CHECK_INT(s.preset[0], 20);
-  CHECK_INT(s.preset[5], 70);
   CHECK_INT(s.baby_count, 0);
 }
 
@@ -90,7 +89,7 @@ TEST(idle_tile_shows_how_long_ago_and_the_detail) {
   model_tile_lines(&s, ACTION_BOTTLE, NOW, l1, sizeof l1, l2, sizeof l2);
   CHECK_STR(l1, "10m ago"); CHECK_STR(l2, "4 oz");
 
-  s.units = UNITS_ML; s.info[ACTION_BOTTLE] = 1200;
+  s.bottle_units = UNITS_ML; s.info[ACTION_BOTTLE] = 1200;
   model_tile_lines(&s, ACTION_BOTTLE, NOW, l1, sizeof l1, l2, sizeof l2);
   CHECK_STR(l2, "120 ml");
 
@@ -102,13 +101,25 @@ TEST(idle_tile_shows_how_long_ago_and_the_detail) {
   model_tile_lines(&s, ACTION_SLEEP, NOW, l1, sizeof l1, l2, sizeof l2);
   CHECK_STR(l2, "1h 12m");
 
-  s.units = UNITS_OZ; s.last[ACTION_PUMP] = NOW - 60; s.info[ACTION_PUMP] = 30;
+  s.pump_units = UNITS_OZ; s.last[ACTION_PUMP] = NOW - 60; s.info[ACTION_PUMP] = 30;
   model_tile_lines(&s, ACTION_PUMP, NOW, l1, sizeof l1, l2, sizeof l2);
   CHECK_STR(l2, "3 oz");
 
   s.last[ACTION_POTTY] = NOW - 60; s.info[ACTION_POTTY] = POTTY_ACCIDENT + 1;
   model_tile_lines(&s, ACTION_POTTY, NOW, l1, sizeof l1, l2, sizeof l2);
   CHECK_STR(l2, "Accident");
+}
+
+TEST(bottle_and_pump_tiles_use_their_own_units) {
+  WatchState s = fresh();
+  char l1[24], l2[24];
+  s.bottle_units = UNITS_OZ; s.pump_units = UNITS_ML;
+  s.last[ACTION_BOTTLE] = NOW - 600; s.info[ACTION_BOTTLE] = 40;
+  s.last[ACTION_PUMP] = NOW - 600; s.info[ACTION_PUMP] = 1200;
+  model_tile_lines(&s, ACTION_BOTTLE, NOW, l1, sizeof l1, l2, sizeof l2);
+  CHECK_STR(l2, "4 oz");
+  model_tile_lines(&s, ACTION_PUMP, NOW, l1, sizeof l1, l2, sizeof l2);
+  CHECK_STR(l2, "120 ml");
 }
 
 TEST(a_tile_with_no_history_shows_dashes) {
@@ -231,6 +242,7 @@ int main(void) {
   RUN(actions_map_to_their_timers);
   RUN(titles_and_labels);
   RUN(idle_tile_shows_how_long_ago_and_the_detail);
+  RUN(bottle_and_pump_tiles_use_their_own_units);
   RUN(a_tile_with_no_history_shows_dashes);
   RUN(a_running_timer_replaces_the_tile_text_with_its_clock);
   RUN(the_banner_shows_the_running_timer);

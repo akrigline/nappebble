@@ -76,7 +76,7 @@ function jobsFor(dict, ctx) {
       const amount = amountX10(dict, 'ARG1');
       if (amount > 0) {
         body.amount = amount;
-        body.unit = ctx.units;
+        body.unit = ctx.bottleUnits;
       }
       body.bottle_type = pick(P.BOTTLE_TYPES, int(dict, 'ARG2', 0), 'bottle type');
       return [entry(withTime(body, minutes(dict, 'ARG3')))];
@@ -108,7 +108,7 @@ function jobsFor(dict, ctx) {
       const amount = amountX10(dict, 'ARG3');
       if (type === 'pumping' && amount > 0) {
         body.amount = amount;
-        body.unit = ctx.units;
+        body.unit = ctx.pumpUnits;
       }
       return [timerJob('timer_stop', type, Object.keys(body).length ? body : undefined)];
     }

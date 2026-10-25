@@ -469,13 +469,13 @@ test('a write queued for one baby still goes to that baby after switching', asyn
 test('closing the settings page saves them, refreshes, and applies layout and units', async () => {
   const h = harness();
   await h.app.handleConfigClosed({
-    token: { value: 'good-token' }, units: { value: 'ml' },
+    token: { value: 'good-token' }, bottleUnits: { value: 'ml' },
     pos_sleep: { value: '1' }, pos_diaper: { value: '2' },
   });
   await h.app.idle();
-  assert.equal(h.settings.get().units, 'ml');
+  assert.equal(h.settings.get().bottleUnits, 'ml');
   const s = h.state();
-  assert.equal(s.UNITS, P.UNITS.ML);
+  assert.equal(s.BOTTLE_UNITS, P.UNITS.ML);
   assert.deepEqual(s.LAYOUT, [P.ACTION.SLEEP, P.ACTION.DIAPER, P.ACTION.STATUS]);
 });
 
@@ -546,4 +546,68 @@ test('prepareConfig with a rejected token explains it on the page', async () => 
   const h = harness({ token: 'wrong' });
   const config = await h.app.prepareConfig();
   assert.match(JSON.stringify(config), /not accepted/i);
+});
+
+// ---------- SET_UNITS ----------
+
+test('SET_UNITS saves the unit for one screen, acks, then sends the new state', async () => {
+  const h = harness();
+  await h.app.start();
+  h.reset();
+  await h.app.onMessage({ CMD: P.CMD.SET_UNITS, CMD_ID: 7, ARG1: P.UNITS_SCREEN.BOTTLE, ARG2: P.UNITS.ML });
+  await h.app.idle();
+  assert.equal(h.settings.get().bottleUnits, 'ml');
+  assert.equal(h.settings.get().pumpUnits, 'oz');
+  assert.deepEqual(h.acks()[0], { ACK_ID: 7, ACK_STATUS: P.STATUS.OK });
+  const order = h.toWatch.map((d) => ('ACK_ID' in d ? 'ack' : 'state'));
+  assert.deepEqual(order.slice(0, 2), ['ack', 'state']);
+  assert.equal(h.state().BOTTLE_UNITS, P.UNITS.ML);
+  assert.equal(h.state().PUMP_UNITS, P.UNITS.OZ);
+});
+
+test('SET_UNITS for the pump screen leaves the bottle unit alone', async () => {
+  const h = harness();
+  await h.app.start();
+  await h.app.onMessage({ CMD: P.CMD.SET_UNITS, CMD_ID: 8, ARG1: P.UNITS_SCREEN.PUMP, ARG2: P.UNITS.ML });
+  await h.app.idle();
+  assert.equal(h.settings.get().pumpUnits, 'ml');
+  assert.equal(h.settings.get().bottleUnits, 'oz');
+  assert.equal(h.state().PUMP_UNITS, P.UNITS.ML);
+});
+
+[
+  ['an unknown screen', { ARG1: 2, ARG2: 1 }],
+  ['an unknown unit', { ARG1: 0, ARG2: 5 }],
+  ['a missing screen', { ARG2: 1 }],
+  ['a missing unit', { ARG1: 0 }],
+].forEach(([name, args]) => {
+  test('SET_UNITS with ' + name + ' acks ERROR and changes nothing', async () => {
+    const h = harness();
+    await h.app.start();
+    const before = h.settings.get();
+    h.reset();
+    await h.app.onMessage(Object.assign({ CMD: P.CMD.SET_UNITS, CMD_ID: 9 }, args));
+    await h.app.idle();
+    assert.deepEqual(h.acks()[0], { ACK_ID: 9, ACK_STATUS: P.STATUS.ERROR });
+    assert.deepEqual(h.settings.get(), before);
+  });
+});
+
+test('a write keeps the unit it was logged in when units change before the queue flushes', async () => {
+  const h = harness();
+  await h.app.start();
+  h.net.offline = true;
+  await h.app.onMessage({ CMD: P.CMD.LOG_BOTTLE, CMD_ID: 1, ARG1: 40, ARG2: 0, ARG3: 0 });
+  await h.app.idle();
+  await h.app.onMessage({ CMD: P.CMD.SET_UNITS, CMD_ID: 2, ARG1: P.UNITS_SCREEN.BOTTLE, ARG2: P.UNITS.ML });
+  await h.app.idle();
+  assert.equal(h.settings.get().bottleUnits, 'ml');
+
+  h.net.offline = false;
+  h.clock.t += 2 * MIN;
+  await h.app.onMessage({ CMD: P.CMD.REFRESH });
+  await h.app.idle();
+  const sent = JSON.parse(h.writes().filter((r) => r.body && r.body.includes('bottle')).pop().body);
+  assert.equal(sent.unit, 'oz');
+  assert.equal(sent.amount, 4);
 });

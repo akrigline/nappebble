@@ -19,7 +19,8 @@ test('fresh settings use the agreed defaults: oz, no token, production API', () 
   const s = createSettings(memoryStorage()).get();
   assert.equal(s.token, '');
   assert.equal(s.babyId, '');
-  assert.equal(s.units, 'oz');
+  assert.equal(s.bottleUnits, 'oz');
+  assert.equal(s.pumpUnits, 'oz');
   assert.equal(s.baseUrl, 'https://api.nappi.app');
   assert.deepEqual(s, DEFAULTS);
 });
@@ -30,17 +31,39 @@ test('update persists and a new store over the same storage reads it back', () =
   const s = createSettings(storage).get();
   assert.equal(s.token, 'abc');
   assert.equal(s.babyId, 'a');
-  assert.equal(s.units, 'oz');
+  assert.equal(s.bottleUnits, 'oz');
 });
 
 test('update merges rather than replaces', () => {
   const store = createSettings(memoryStorage());
   store.update({ token: 'abc' });
-  store.update({ units: 'ml' });
+  store.update({ bottleUnits: 'ml' });
   assert.deepEqual(
-    [store.get().token, store.get().units],
+    [store.get().token, store.get().bottleUnits],
     ['abc', 'ml'],
   );
+});
+
+test('a stored legacy units value fills both per-screen units', () => {
+  const storage = memoryStorage({ 'nappi.settings': JSON.stringify({ units: 'ml' }) });
+  const s = createSettings(storage).get();
+  assert.equal(s.bottleUnits, 'ml');
+  assert.equal(s.pumpUnits, 'ml');
+});
+
+test('a stored per-screen value wins over the legacy units value', () => {
+  const storage = memoryStorage({ 'nappi.settings': JSON.stringify({ units: 'ml', bottleUnits: 'oz' }) });
+  const s = createSettings(storage).get();
+  assert.equal(s.bottleUnits, 'oz');
+  assert.equal(s.pumpUnits, 'ml');
+});
+
+test('empty storage gives oz for both, and no units or bottlePresets key exists', () => {
+  const s = createSettings(memoryStorage()).get();
+  assert.equal(s.bottleUnits, 'oz');
+  assert.equal(s.pumpUnits, 'oz');
+  assert.equal('units' in s, false);
+  assert.equal('bottlePresets' in s, false);
 });
 
 test('corrupt stored JSON falls back to defaults instead of throwing', () => {

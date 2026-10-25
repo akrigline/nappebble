@@ -59,11 +59,18 @@ test('a load error is shown instead of the generic hint', () => {
   assert.ok(texts.some((t) => /rejected/.test(t)));
 });
 
-test('units offers oz and ml and defaults to the saved choice', () => {
-  const config = buildConfig({ settings: { ...DEFAULTS, units: 'ml' }, babies: [] });
-  const units = byKey(config, 'units');
-  assert.deepEqual(units.options.map((o) => o.value), ['oz', 'ml']);
-  assert.equal(units.defaultValue, 'ml');
+test('bottle and pump units each offer oz and ml and default to the saved choice', () => {
+  const config = buildConfig({ settings: { ...DEFAULTS, bottleUnits: 'ml', pumpUnits: 'oz' }, babies: [] });
+  const bottle = byKey(config, 'bottleUnits');
+  const pump = byKey(config, 'pumpUnits');
+  assert.equal(bottle.type, 'select');
+  assert.equal(pump.type, 'select');
+  assert.deepEqual(bottle.options.map((o) => o.value), ['oz', 'ml']);
+  assert.deepEqual(pump.options.map((o) => o.value), ['oz', 'ml']);
+  assert.equal(bottle.defaultValue, 'ml');
+  assert.equal(pump.defaultValue, 'oz');
+  assert.equal(byKey(config, 'units'), undefined);
+  assert.equal(byKey(config, 'bottlePresets'), undefined);
 });
 
 test('the API address is tucked into a Developer section', () => {
@@ -84,18 +91,26 @@ test('a Clay response is flattened to a settings patch', () => {
   const patch = settingsFromClayResponse({
     token: { value: '  abc  ' },
     babyId: { value: 'b' },
-    units: { value: 'ml' },
+    bottleUnits: { value: 'ml' },
+    pumpUnits: { value: 'oz' },
     baseUrl: { value: 'http://localhost:4010/' },
   });
-  assert.deepEqual(patch, { token: 'abc', babyId: 'b', units: 'ml', baseUrl: 'http://localhost:4010' });
+  assert.deepEqual(patch, { token: 'abc', babyId: 'b', bottleUnits: 'ml', pumpUnits: 'oz', baseUrl: 'http://localhost:4010' });
 });
 
 test('plain (non-{value}) responses are accepted too', () => {
   assert.deepEqual(settingsFromClayResponse({ token: 'abc' }), { token: 'abc' });
 });
 
+test('a Clay response carries the two per-screen units', () => {
+  assert.deepEqual(
+    settingsFromClayResponse({ bottleUnits: { value: 'ml' }, pumpUnits: { value: 'oz' } }),
+    { bottleUnits: 'ml', pumpUnits: 'oz' },
+  );
+});
+
 test('an unknown unit is ignored rather than saved', () => {
-  assert.deepEqual(settingsFromClayResponse({ units: { value: 'stone' } }), {});
+  assert.deepEqual(settingsFromClayResponse({ bottleUnits: { value: 'stone' }, pumpUnits: { value: 'cup' }, units: { value: 'ml' } }), {});
 });
 
 test('a blank API address resets to the production default', () => {
@@ -111,11 +126,12 @@ test('a response with no baby chosen leaves the saved baby alone', () => {
 });
 
 test('prefill maps each message key to the value the form should show', () => {
-  const config = buildConfig({ settings: { ...DEFAULTS, token: 'abc', units: 'ml' }, babies: [A, B] });
+  const config = buildConfig({ settings: { ...DEFAULTS, token: 'abc', bottleUnits: 'ml' }, babies: [A, B] });
   const prefill = prefillFor(config);
   assert.equal(prefill.token, 'abc');
   assert.equal(prefill.babyId, 'a');
-  assert.equal(prefill.units, 'ml');
+  assert.equal(prefill.bottleUnits, 'ml');
+  assert.equal(prefill.pumpUnits, 'oz');
   assert.equal(prefill.baseUrl, DEFAULTS.baseUrl);
 });
 

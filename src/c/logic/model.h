@@ -19,13 +19,12 @@ typedef struct {
   uint8_t baby_count, baby_index, baby_accent;
   bool other_timers;
 
-  uint8_t units;
+  uint8_t bottle_units, pump_units;
   bool exit_after_log;
   uint8_t default_bottle;
 
   uint8_t layout[ACTION_COUNT];
   uint8_t layout_count;
-  int32_t preset[PRESET_COUNT];      // amount x10, 0 = empty slot
 
   int32_t last[ACTION_COUNT];        // epoch seconds, 0 = none
   int32_t info[ACTION_COUNT];

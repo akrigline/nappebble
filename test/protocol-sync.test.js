@@ -29,6 +29,7 @@ const GROUPS = {
   SIDE: P.SIDE,
   TIMER_STATE: P.TIMER_STATE,
   UNITS: P.UNITS,
+  UNITS_SCREEN: P.UNITS_SCREEN,
 };
 
 Object.keys(GROUPS).forEach((group) => {
@@ -41,13 +42,16 @@ Object.keys(GROUPS).forEach((group) => {
     Object.keys(c).filter((k) => k.startsWith(group + '_') && !k.endsWith('_COUNT')).forEach((k) => { actual[k] = c[k]; });
     // TIMER_ is a prefix of TIMER_STATE_, so drop the longer group's names.
     if (group === 'TIMER') Object.keys(actual).filter((k) => k.startsWith('TIMER_STATE_')).forEach((k) => delete actual[k]);
+    // Likewise UNITS_ is a prefix of UNITS_SCREEN_.
+    if (group === 'UNITS') Object.keys(actual).filter((k) => k.startsWith('UNITS_SCREEN_')).forEach((k) => delete actual[k]);
     assert.deepEqual(actual, expected);
   });
 });
 
 test('protocol.h counts match the array sizes in the message keys', () => {
   const c = defines();
-  assert.equal(c.PRESET_COUNT, P.PRESET_COUNT);
+  assert.equal('PRESET_COUNT' in c, false);
+  assert.equal('PRESET_COUNT' in P, false);
   assert.equal(c.ACTION_COUNT, Object.keys(P.ACTION).length);
   assert.equal(c.TIMER_COUNT, Object.keys(P.TIMER).length);
 });
@@ -58,7 +62,7 @@ test('package.json messageKeys are exactly the protocol key list', () => {
 });
 
 test('array message keys carry their length, matching the protocol constants', () => {
-  assert.ok(P.MESSAGE_KEYS.includes('PRESET[' + P.PRESET_COUNT + ']'));
+  assert.ok(!P.MESSAGE_KEYS.some((k) => k.startsWith('PRESET')));
   assert.ok(P.MESSAGE_KEYS.includes('LAST[' + Object.keys(P.ACTION).length + ']'));
   assert.ok(P.MESSAGE_KEYS.includes('INFO[' + Object.keys(P.ACTION).length + ']'));
   assert.ok(P.MESSAGE_KEYS.includes('TIMER_STATE[' + Object.keys(P.TIMER).length + ']'));

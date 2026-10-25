@@ -3,23 +3,22 @@
 
 const KEY = 'nappi.settings';
 
-const DEFAULT_PRESETS = Object.freeze({
-  oz: Object.freeze([2, 3, 4, 5, 6, 7]),
-  ml: Object.freeze([60, 90, 120, 150, 180, 210])
-});
-
 const DEFAULTS = Object.freeze({
   token: '',
   babyId: '',
-  units: 'oz',
+  // Each amount screen has its own unit; the watch changes them with SET_UNITS.
+  bottleUnits: 'oz',
+  pumpUnits: 'oz',
   baseUrl: 'https://api.nappi.app',
   // Visible tiles in grid order (Status is always appended last by the state builder).
   layout: Object.freeze(['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']),
-  // Empty means "use DEFAULT_PRESETS for the current units".
-  bottlePresets: Object.freeze([]),
   defaultBottleType: 'formula',
   exitAfterLog: false
 });
+
+function isUnit(value) {
+  return value === 'oz' || value === 'ml';
+}
 
 function copy(value) {
   return Array.isArray(value) ? value.slice() : value;
@@ -37,6 +36,10 @@ function createSettings(storage) {
     Object.keys(DEFAULTS).forEach((name) => {
       result[name] = copy(name in stored ? stored[name] : DEFAULTS[name]);
     });
+    // Older installs stored one `units` for everything.
+    const legacy = isUnit(stored.units) ? stored.units : DEFAULTS.bottleUnits;
+    result.bottleUnits = isUnit(stored.bottleUnits) ? stored.bottleUnits : legacy;
+    result.pumpUnits = isUnit(stored.pumpUnits) ? stored.pumpUnits : legacy;
     return result;
   }
 
@@ -48,4 +51,4 @@ function createSettings(storage) {
   };
 }
 
-module.exports = { createSettings, DEFAULTS, DEFAULT_PRESETS };
+module.exports = { createSettings, DEFAULTS };
