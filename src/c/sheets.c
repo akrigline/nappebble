@@ -108,12 +108,18 @@ static void amount_refresh(GridView *gv) {
 static void set_units(GridView *gv, int units) {
   SheetCtx *c = ctx_of(gv);
   if (units == c->units) return;
+  // The phone reads logged amounts in its saved unit, so the watch only
+  // switches once the phone has been told; otherwise the sheet stays as it was.
+  if (!comm_send(CMD_SET_UNITS, c->screen == AMOUNT_BOTTLE ? UNITS_SCREEN_BOTTLE : UNITS_SCREEN_PUMP, units, 0, 0)) {
+    vibes_double_pulse();
+    grid_view_flash(gv, 2, "Phone not connected", 1500, NULL);
+    return;
+  }
   StripGeom g = amount_geom(c->screen, units);
   c->value = strip_snap(&g, amount_convert(c->value, c->units, units));
   c->units = units;
   amount_refresh(gv);
   grid_view_commit(gv);
-  comm_send(CMD_SET_UNITS, c->screen == AMOUNT_BOTTLE ? UNITS_SCREEN_BOTTLE : UNITS_SCREEN_PUMP, c->units, 0, 0);
 }
 
 // Unit chips at y, then the amount strip in `strip`; adds both zones.
