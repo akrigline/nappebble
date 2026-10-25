@@ -47,15 +47,6 @@ TEST(amount_in_oz_and_ml) {
   fmt_amount(b, sizeof b, 0, UNITS_OZ);     CHECK_STR(b, "0 oz");
 }
 
-TEST(backdate_chip_labels) {
-  char b[16];
-  fmt_backdate(b, sizeof b, 0);   CHECK_STR(b, "Now");
-  fmt_backdate(b, sizeof b, 5);   CHECK_STR(b, "-5m");
-  fmt_backdate(b, sizeof b, 45);  CHECK_STR(b, "-45m");
-  fmt_backdate(b, sizeof b, 60);  CHECK_STR(b, "-1h");
-  fmt_backdate(b, sizeof b, 90);  CHECK_STR(b, "-1h30m");
-}
-
 TEST(strip_time_readout) {
   char b[32];
   fmt_strip_time(b, sizeof b, 0, 14, 41, false);   CHECK_STR(b, "Now - 2:41 PM");
@@ -79,7 +70,6 @@ int main(void) {
   RUN(ago_never_overflows_a_small_buffer);
   RUN(clock_formats_minutes_then_hours);
   RUN(amount_in_oz_and_ml);
-  RUN(backdate_chip_labels);
   RUN(strip_time_readout);
   RUN(duration_minutes);
   FINISH();

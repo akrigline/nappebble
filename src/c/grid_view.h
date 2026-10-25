@@ -44,7 +44,6 @@ typedef struct {
   void (*on_swipe)(GridView *gv, int direction);   // SWIPE_LEFT / SWIPE_RIGHT
   void (*on_tick)(GridView *gv);
   void (*on_state)(GridView *gv);                  // phone state changed
-  void (*on_slider)(GridView *gv, int y);          // touch inside the slider track
   void (*on_strip)(GridView *gv, int cell, int x); // touchdown and every move on a strip
   void (*on_adjust)(GridView *gv, int zone, int dir);  // Up/Down on an ADJUST zone
   void (*on_unload)(GridView *gv);
@@ -68,9 +67,6 @@ struct GridView {
   char message[40];
   AppTimer *overlay_timer;
   void (*overlay_done)(GridView *gv);
-  bool has_slider;
-  Rect slider_track;
-  int slider_knob_y;
   int strip_drag;            // strip cell being dragged, or -1
   Nav nav;                   // zone focus for the buttons when has_nav
   bool has_nav;

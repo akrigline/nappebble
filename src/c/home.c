@@ -53,19 +53,21 @@ static void open_action(int action, bool long_press) {
   int timer = model_timer_for_action(action);
   bool active = timer >= 0 && model_timer_active(s, timer);
 
+  // Only Sleep and Pump tell a long press apart: a tap starts the timer now,
+  // a long press opens the start sheet to backdate it.
   switch (action) {
-    case ACTION_DIAPER: sheet_diaper(long_press); break;
-    case ACTION_BOTTLE: sheet_bottle(long_press); break;
-    case ACTION_POTTY: sheet_potty(long_press); break;
+    case ACTION_DIAPER: sheet_diaper(); break;
+    case ACTION_BOTTLE: sheet_bottle(); break;
+    case ACTION_POTTY: sheet_potty(); break;
     case ACTION_STATUS: sheet_status(); break;
     case ACTION_NURSING:
       if (active) timer_view_open(timer);
-      else sheet_nursing_start(long_press);
+      else sheet_nursing_start();
       break;
     case ACTION_SLEEP:
     case ACTION_PUMP:
       if (active) timer_view_open(timer);
-      else if (long_press) sheet_timer_start(action, true);
+      else if (long_press) sheet_timer_start(action);
       else ui_send(action, action == ACTION_SLEEP ? "Sleep started" : "Pump started", CMD_TIMER_START, timer, 0, 0, 0);
       break;
     default: break;

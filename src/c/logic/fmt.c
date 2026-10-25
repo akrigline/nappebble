@@ -31,13 +31,6 @@ void fmt_amount(char *buf, size_t n, int32_t x10, int units) {
   else snprintf(buf, n, "%d.%d %s", whole, frac, unit);
 }
 
-void fmt_backdate(char *buf, size_t n, int minutes) {
-  if (minutes <= 0) snprintf(buf, n, "Now");
-  else if (minutes < 60) snprintf(buf, n, "-%dm", minutes);
-  else if (minutes % 60 == 0) snprintf(buf, n, "-%dh", minutes / 60);
-  else snprintf(buf, n, "-%dh%dm", minutes / 60, minutes % 60);
-}
-
 void fmt_duration_min(char *buf, size_t n, int minutes) {
   if (minutes < 60) snprintf(buf, n, "%dm", minutes);
   else if (minutes % 60 == 0) snprintf(buf, n, "%dh", minutes / 60);

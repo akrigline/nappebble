@@ -100,7 +100,13 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
     bool has_sub = c->l1[0] != '\0';
     bool small = r.h < 40 || (r.w < 100 && strlen(c->title) > 7);
     int h = small ? 22 : (has_sub ? 28 : 30);
-    draw_text(ctx, c->title, small ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_24_BOLD,
+    const char *font = small ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_24_BOLD;
+    // Narrow columns (Potty's three) step down once more rather than truncate.
+    if (small && graphics_text_layout_get_content_size(c->title, fonts_get_system_font(font), GRect(0, 0, 400, h),
+                                                       GTextOverflowModeWordWrap, GTextAlignmentCenter).w > r.w - 4) {
+      font = FONT_KEY_GOTHIC_14_BOLD;
+    }
+    draw_text(ctx, c->title, font,
               GRect(r.x + 2, r.y + (r.h - h) / 2 - (small ? 3 : (has_sub ? 7 : 4)), r.w - 4, h), GTextAlignmentCenter, fg);
     if (has_sub) draw_text(ctx, c->l1, FONT_KEY_GOTHIC_14, GRect(r.x + 2, r.y + r.h / 2 + 8, r.w - 4, 16), GTextAlignmentCenter, fg);
   } else {  // chip
@@ -126,6 +132,7 @@ static void draw_zone_focus(GContext *ctx, const GridView *gv) {
   int first = gv->zone_cell[z];
   int n = gv->zone_cells[z];
   if (gv->nav.zones[z].kind == ZONE_CHOICE) {
+    if (gv->nav.item >= n) return;
     first += gv->nav.item;
     n = 1;
   }
@@ -142,14 +149,6 @@ static void draw_zone_focus(GContext *ctx, const GridView *gv) {
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 3);
   graphics_draw_round_rect(ctx, GRect(u.x + 1, u.y + 1, x1 - u.x - 2, y1 - u.y - 2), CORNER);
-}
-
-static void draw_slider(GContext *ctx, const GridView *gv) {
-  Rect t = gv->slider_track;
-  graphics_context_set_fill_color(ctx, GColorLightGray);
-  graphics_fill_rect(ctx, GRect(t.x + t.w / 2 - 3, t.y, 6, t.h), 3, GCornersAll);
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_circle(ctx, GPoint(t.x + t.w / 2, gv->slider_knob_y), 11);
 }
 
 static void draw_dots(GContext *ctx, const GridView *gv) {
@@ -185,7 +184,6 @@ static void layer_update(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
   for (int i = 0; i < gv->count; i++) draw_cell(ctx, gv, i);
-  if (gv->has_slider) draw_slider(ctx, gv);
   if (gv->has_nav && gv->show_focus) draw_zone_focus(ctx, gv);
   draw_dots(ctx, gv);
   draw_overlay(ctx, gv);
@@ -200,7 +198,6 @@ static void redraw(GridView *gv) {
 void grid_view_clear(GridView *gv) {
   gv->count = 0;
   gv->pressed = -1;
-  gv->has_slider = false;
 }
 
 GridCell *grid_view_add(GridView *gv, CellKind kind, Rect rect, const char *title, const char *l1,
@@ -333,32 +330,19 @@ static int strip_at(const GridView *gv, int x, int y) {
   return -1;
 }
 
-static bool in_slider(const GridView *gv, int x, int y) {
-  if (!gv->has_slider) return false;
-  Rect t = gv->slider_track;
-  return x >= t.x - 24 && x < t.x + t.w + 24 && y >= t.y - 12 && y < t.y + t.h + 12;
-}
-
 static void touch_handler(const TouchEvent *e, void *context) {
   GridView *gv = context;
   if (e->non_navigational || gv->overlay) return;
 
   // A strip owns the whole gesture from its touchdown, wherever the finger goes.
-  if (e->type == TouchEvent_Touchdown) {
-    int strip = strip_at(gv, e->x, e->y);
-    if (strip >= 0) gv->strip_drag = strip;
-  }
+  // Every touchdown resets it, so a missed liftoff cannot swallow the next tap.
+  if (e->type == TouchEvent_Touchdown) gv->strip_drag = strip_at(gv, e->x, e->y);
   if (gv->strip_drag >= 0) {
     if (e->type == TouchEvent_Liftoff) {
       gv->strip_drag = -1;
     } else if (gv->h.on_strip) {
       gv->h.on_strip(gv, gv->strip_drag, e->x);
     }
-    return;
-  }
-
-  if (in_slider(gv, e->x, e->y) && e->type != TouchEvent_Liftoff) {
-    if (gv->h.on_slider) gv->h.on_slider(gv, e->y);
     return;
   }
 
@@ -442,7 +426,7 @@ static void apply_nav(GridView *gv, NavEffect e) {
       redraw(gv);
       break;
     case NAV_ACTIVATE:
-      if (gv->h.on_activate) gv->h.on_activate(gv, gv->zone_cell[e.zone] + e.item, false);
+      if (e.item < gv->zone_cells[e.zone] && gv->h.on_activate) gv->h.on_activate(gv, gv->zone_cell[e.zone] + e.item, false);
       break;
     case NAV_LEAVE:
       window_stack_pop(true);
