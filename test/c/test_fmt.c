@@ -56,6 +56,15 @@ TEST(backdate_chip_labels) {
   fmt_backdate(b, sizeof b, 90);  CHECK_STR(b, "-1h30m");
 }
 
+TEST(strip_time_readout) {
+  char b[32];
+  fmt_strip_time(b, sizeof b, 0, 14, 41, false);   CHECK_STR(b, "Now - 2:41 PM");
+  fmt_strip_time(b, sizeof b, 20, 14, 21, false);  CHECK_STR(b, "20 min ago - 2:21 PM");
+  fmt_strip_time(b, sizeof b, 60, 0, 5, false);    CHECK_STR(b, "60 min ago - 12:05 AM");
+  fmt_strip_time(b, sizeof b, 5, 12, 0, false);    CHECK_STR(b, "5 min ago - 12:00 PM");
+  fmt_strip_time(b, sizeof b, 0, 14, 41, true);    CHECK_STR(b, "Now - 14:41");
+}
+
 TEST(duration_minutes) {
   char b[16];
   fmt_duration_min(b, sizeof b, 0);   CHECK_STR(b, "0m");
@@ -71,6 +80,7 @@ int main(void) {
   RUN(clock_formats_minutes_then_hours);
   RUN(amount_in_oz_and_ml);
   RUN(backdate_chip_labels);
+  RUN(strip_time_readout);
   RUN(duration_minutes);
   FINISH();
 }

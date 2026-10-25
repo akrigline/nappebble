@@ -43,3 +43,16 @@ void fmt_duration_min(char *buf, size_t n, int minutes) {
   else if (minutes % 60 == 0) snprintf(buf, n, "%dh", minutes / 60);
   else snprintf(buf, n, "%dh %dm", minutes / 60, minutes % 60);
 }
+
+void fmt_strip_time(char *buf, size_t n, int minutes_ago, int hour, int minute, bool is24h) {
+  char when[16];
+  if (is24h) {
+    snprintf(when, sizeof when, "%02d:%02d", hour, minute);
+  } else {
+    int h12 = hour % 12;
+    if (h12 == 0) h12 = 12;
+    snprintf(when, sizeof when, "%d:%02d %s", h12, minute, hour >= 12 ? "PM" : "AM");
+  }
+  if (minutes_ago <= 0) snprintf(buf, n, "Now - %s", when);
+  else snprintf(buf, n, "%d min ago - %s", minutes_ago, when);
+}
