@@ -604,10 +604,14 @@ test('a write keeps the unit it was logged in when units change before the queue
   assert.equal(h.settings.get().bottleUnits, 'ml');
 
   h.net.offline = false;
+  h.net.requests.length = 0;
   h.clock.t += 2 * MIN;
   await h.app.onMessage({ CMD: P.CMD.REFRESH });
   await h.app.idle();
-  const sent = JSON.parse(h.writes().filter((r) => r.body && r.body.includes('bottle')).pop().body);
+  assert.equal(h.state().PENDING, 0);
+  const flushed = h.writes().filter((r) => r.body && r.body.includes('bottle'));
+  assert.equal(flushed.length, 1);
+  const sent = JSON.parse(flushed[0].body);
   assert.equal(sent.unit, 'oz');
   assert.equal(sent.amount, 4);
 });

@@ -26,10 +26,12 @@ const ACTION = Object.freeze({
 
 // Watch -> phone commands (CMD key, with ARG1..ARG4 and a CMD_ID echoed in the ACK).
 //   LOG_DIAPER    ARG1 DIAPER_*, ARG2 minutes ago
-//   LOG_BOTTLE    ARG1 amount x10 (in the bottle screen's units), ARG2 BOTTLE_TYPE_*, ARG3 minutes ago
+//   LOG_BOTTLE    ARG1 amount x10, ARG2 BOTTLE_TYPE_*, ARG3 minutes ago,
+//                 ARG4 UNITS_* the amount is in (absent or invalid: the saved bottle units)
 //   LOG_POTTY     ARG1 POTTY_*, ARG2 minutes ago
 //   TIMER_START   ARG1 TIMER_*, ARG2 SIDE_*, ARG3 minutes ago
-//   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (in the pump screen's units, 0 none)
+//   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (0 none),
+//                 ARG4 UNITS_* the amount is in (absent or invalid: the saved pump units)
 //   TIMER_SWITCH  ARG1 new SIDE_* (stop the nursing timer, start the other side)
 //   SWITCH_BABY   ARG1 baby index
 //   SET_UNITS     ARG1 UNITS_SCREEN_*, ARG2 UNITS_* (the unit that screen shows and logs in)

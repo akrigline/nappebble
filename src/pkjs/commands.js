@@ -41,6 +41,13 @@ function amountX10(dict, key) {
   return a / 10;
 }
 
+// The unit the watch logged the amount in (ARG4), else the screen's saved setting.
+function unitName(dict, saved) {
+  if (dict.ARG4 === P.UNITS.OZ) return 'oz';
+  if (dict.ARG4 === P.UNITS.ML) return 'ml';
+  return saved;
+}
+
 function sideName(side) {
   if (side === P.SIDE.LEFT) return 'left';
   if (side === P.SIDE.RIGHT) return 'right';
@@ -76,7 +83,7 @@ function jobsFor(dict, ctx) {
       const amount = amountX10(dict, 'ARG1');
       if (amount > 0) {
         body.amount = amount;
-        body.unit = ctx.bottleUnits;
+        body.unit = unitName(dict, ctx.bottleUnits);
       }
       body.bottle_type = pick(P.BOTTLE_TYPES, int(dict, 'ARG2', 0), 'bottle type');
       return [entry(withTime(body, minutes(dict, 'ARG3')))];
@@ -108,7 +115,7 @@ function jobsFor(dict, ctx) {
       const amount = amountX10(dict, 'ARG3');
       if (type === 'pumping' && amount > 0) {
         body.amount = amount;
-        body.unit = ctx.pumpUnits;
+        body.unit = unitName(dict, ctx.pumpUnits);
       }
       return [timerJob('timer_stop', type, Object.keys(body).length ? body : undefined)];
     }

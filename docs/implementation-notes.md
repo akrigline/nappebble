@@ -31,7 +31,7 @@ Status of `docs/pebble-nappi-spec-v2.md` against the code. Milestones M0 to M4 a
 - **Activity is removed.** The tile, sheet, command, message keys, Clay layout entry and tests are gone from the watch and the phone. A saved layout that still lists it is tolerated. The API client and mock still support activities.
 - **Presets and the Custom screen are replaced by the amount strip.** The Clay bottle presets setting is gone; the starting amount is the last amount logged on that screen.
 - **Long press is kept only on Sleep and Pump.** A tap starts the timer at once; a long press opens the start sheet to backdate. On every other tile a long press is a tap. This replaces the spec's long-press backdate set (-5..-60 min chips) with the time strip.
-- **Units are per screen and can be changed from the watch.** The single Clay "Units" setting became "Bottle units" and "Pump units" (an old `units` value seeds both). The oz / ml chips send `SET_UNITS` (screen 0 bottle, 1 pump; units 0 oz, 1 ml); the phone ACKs, saves and pushes state. If the send cannot be queued the unit stays unchanged and "Phone not connected" shows. A write keeps the unit it was logged in, even if the unit changes before the queue flushes.
+- **Units are per screen and can be changed from the watch.** The single Clay "Units" setting became "Bottle units" and "Pump units" (an old `units` value seeds both). The oz / ml chips send `SET_UNITS` (screen 0 bottle, 1 pump; units 0 oz, 1 ml); the phone ACKs, saves and pushes state. If the send cannot be queued the unit stays unchanged and "Phone not connected" shows. A write keeps the unit it was logged in, even if the unit changes before the queue flushes: the watch sends the unit with `LOG_BOTTLE` and the pump `TIMER_STOP` (ARG4), and the phone falls back to its saved setting only if it is absent or invalid.
 - Acknowledgement is optimistic: the ACK means "queued", and the checkmark shows immediately. Delivery happens afterwards.
 
 ## Verified, and not
@@ -52,8 +52,8 @@ Exercised by hand in the Emery emulator with the mock server: launch from cache,
 - **The Clay page with the two unit selects** (Bottle units, Pump units) was not opened in a browser or the Core Devices app.
 - **The readout font width on a real watch.** The long time readout ("60 min ago - 12:41 PM") and the amount readout have only been seen in the emulator.
 - Exit-after-log and persisted-cache launch after a cold start were not run on a device.
-- **A queued `SET_UNITS` that is later NACKed or times out is not handled on an open sheet.** The sheet and the phone could then disagree on the unit until the sheet is reopened. (A send that cannot be queued is handled: the unit stays unchanged and "Phone not connected" shows.)
-- **An open sheet does not follow unit changes made in the phone settings** until it is reopened.
+- **A queued `SET_UNITS` that is later NACKed or times out is not handled on an open sheet.** The sheet and the phone's saved setting could then disagree until the sheet is reopened; amounts are still logged in the unit the sheet showed, because the unit travels with the command. (A send that cannot be queued is handled: the unit stays unchanged and "Phone not connected" shows.)
+- **An open sheet does not follow unit changes made in the phone settings** until it is reopened; amounts it logs are still in the unit it showed, because the unit travels with the command.
 
 **Known issue, not fixed here**
 - After the pump stop flow returns to Home, Up / Down / Select stop responding and Back exits the app. It was seen before this work and reproduced at the commit prior to the sheets rewrite, so it is not caused by the strips. Likely cause: the timer view popping itself while `ui_pop_to_home` runs. Not investigated further.

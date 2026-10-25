@@ -39,6 +39,42 @@ test('bottle amounts follow the ml setting and keep one decimal', () => {
   assert.equal(one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 25, ARG2: 0, ARG3: 0 }).body.amount, 2.5);
 });
 
+test('a bottle is logged in the unit the watch sent, not the saved setting', () => {
+  const oz = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 40, ARG2: 0, ARG3: 0, ARG4: P.UNITS.OZ }, { bottleUnits: 'ml' });
+  assert.equal(oz.body.amount, 4);
+  assert.equal(oz.body.unit, 'oz');
+  const ml = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 1200, ARG2: 0, ARG3: 0, ARG4: P.UNITS.ML }, { bottleUnits: 'oz' });
+  assert.equal(ml.body.amount, 120);
+  assert.equal(ml.body.unit, 'ml');
+});
+
+test('a bottle with no or an invalid unit falls back to the bottle setting', () => {
+  const absent = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 1200, ARG2: 0, ARG3: 0 }, { bottleUnits: 'ml' });
+  assert.equal(absent.body.amount, 120);
+  assert.equal(absent.body.unit, 'ml');
+  const invalid = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 40, ARG2: 0, ARG3: 0, ARG4: 5 }, { bottleUnits: 'oz' });
+  assert.equal(invalid.body.amount, 4);
+  assert.equal(invalid.body.unit, 'oz');
+});
+
+test('a pump stop is logged in the unit the watch sent, not the saved setting', () => {
+  const oz = one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 40, ARG4: P.UNITS.OZ }, { pumpUnits: 'ml' });
+  assert.deepEqual(oz.body, { amount: 4, unit: 'oz' });
+  const ml = one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 1200, ARG4: P.UNITS.ML }, { pumpUnits: 'oz' });
+  assert.deepEqual(ml.body, { amount: 120, unit: 'ml' });
+});
+
+test('a pump stop with no or an invalid unit falls back to the pump setting', () => {
+  const absent = one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 1200 }, { pumpUnits: 'ml' });
+  assert.deepEqual(absent.body, { amount: 120, unit: 'ml' });
+  const invalid = one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 40, ARG4: 5 }, { pumpUnits: 'oz' });
+  assert.deepEqual(invalid.body, { amount: 4, unit: 'oz' });
+});
+
+test('a skipped pump amount sends no body whatever the unit', () => {
+  assert.equal(one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 0, ARG4: P.UNITS.ML }).body, undefined);
+});
+
 test('a bottle uses the bottle units and a pump stop uses the pump units', () => {
   const bottle = one({ CMD: P.CMD.LOG_BOTTLE, ARG1: 40, ARG2: 0, ARG3: 0 }, { bottleUnits: 'oz', pumpUnits: 'ml' });
   assert.equal(bottle.body.amount, 4);

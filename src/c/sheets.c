@@ -313,7 +313,7 @@ static void bottle_choose(GridView *gv, int k) {
   int type = k == 1 ? BOTTLE_TYPE_BREAST_MILK : BOTTLE_TYPE_FORMULA;
   char what[24];
   fmt_amount(what, sizeof(what), c->value, c->units);
-  if (ui_send(ACTION_BOTTLE, what, CMD_LOG_BOTTLE, c->value, type, minutes_ago(gv), 0)) remember_amount(c);
+  if (ui_send(ACTION_BOTTLE, what, CMD_LOG_BOTTLE, c->value, type, minutes_ago(gv), c->units)) remember_amount(c);
 }
 
 void sheet_bottle(void) {
@@ -334,12 +334,12 @@ void sheet_bottle(void) {
 static void pump_amount_choose(GridView *gv, int k) {
   SheetCtx *c = ctx_of(gv);
   if (k == 1) {
-    ui_send(ACTION_PUMP, "Pump saved", CMD_TIMER_STOP, TIMER_PUMPING, 0, 0, 0);
+    ui_send(ACTION_PUMP, "Pump saved", CMD_TIMER_STOP, TIMER_PUMPING, 0, 0, c->units);
     return;
   }
   char what[24];
   fmt_amount(what, sizeof(what), c->value, c->units);
-  if (ui_send(ACTION_PUMP, what, CMD_TIMER_STOP, TIMER_PUMPING, 0, c->value, 0)) remember_amount(c);
+  if (ui_send(ACTION_PUMP, what, CMD_TIMER_STOP, TIMER_PUMPING, 0, c->value, c->units)) remember_amount(c);
 }
 
 void sheet_pump_amount(void) {
