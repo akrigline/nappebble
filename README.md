@@ -21,6 +21,8 @@ Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` 
 
 `pebble emu-app-config --emulator emery` opens the Clay page and listens on `http://localhost:<port>/close?`. The page's Save button redirects there with the form values. To skip the browser, GET that URL yourself with the URL-encoded JSON, e.g. `{"token":{"value":"dev-token"},"baseUrl":{"value":"http://localhost:4010"}}`. The port is in the generated `~/pebble-tool-emu-app-config-*.html` (`return_to=`), which the tool deletes once used.
 
+Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bottleUnits":{"value":"ml"}`. The watch changes them too: the oz / ml chips on Bottle and Pump "How much?" send `SET_UNITS` (CMD 10; args: screen 0 bottle / 1 pump, units 0 oz / 1 ml). The phone saves the unit, ACKs, then pushes state.
+
 ## Layout
 
 - `src/pkjs/` phone logic. `index.js` is the only file touching Pebble globals; everything else is plain CommonJS under test.
