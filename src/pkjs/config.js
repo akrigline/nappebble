@@ -9,11 +9,11 @@ const NO_BABIES_HINT = 'Enter your API token and save, then reopen these setting
   'Create a token at nappi.app/app/connections.';
 
 // Default grid order; also the tie-break when two tiles share a position.
-const ACTION_ORDER = ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty', 'activity'];
+const ACTION_ORDER = ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty'];
 const ACTION_LABELS = {
-  diaper: 'Diaper', bottle: 'Bottle', nursing: 'Nursing', sleep: 'Sleep', pump: 'Pump', potty: 'Potty', activity: 'Activity'
+  diaper: 'Diaper', bottle: 'Bottle', nursing: 'Nursing', sleep: 'Sleep', pump: 'Pump', potty: 'Potty'
 };
-const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const BOTTLE_TYPES = ['formula', 'breast_milk'];
 const MAX_PRESET = 1000;
 

@@ -87,14 +87,6 @@ function jobsFor(dict, ctx) {
         type: 'potty', outcome: pick(P.POTTY_OUTCOMES, int(dict, 'ARG1'), 'potty outcome')
       }, minutes(dict, 'ARG2')))];
 
-    case P.CMD.LOG_ACTIVITY: {
-      const body = { type: 'activity', activity_type: pick(P.ACTIVITY_TYPES, int(dict, 'ARG1'), 'activity') };
-      const duration = int(dict, 'ARG2', 0);
-      if (duration < 0 || duration > 1440) throw new BadCommand('duration out of range');
-      if (duration > 0) body.duration_minutes = duration;
-      return [entry(withTime(body, minutes(dict, 'ARG3')))];
-    }
-
     case P.CMD.TIMER_START: {
       const type = timerType(int(dict, 'ARG1'));
       const body = {};

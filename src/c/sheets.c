@@ -17,7 +17,6 @@ typedef struct {
   bool backdate;
   int chip_first, chip_count, chip_sel;
   int chip_values[CHIP_MAX];
-  bool chip_duration;       // activity: chips are durations, not minutes ago
   int type_first;           // bottle: first of the two type toggles
   int bottle_type;
   int btn_first;            // first content button
@@ -38,22 +37,16 @@ static SheetCtx *ctx_of(GridView *gv) {
 
 // ---- chips ----
 
-static void add_chips(GridView *gv, SheetCtx *c, const int *values, int count, bool duration) {
+static void add_chips(GridView *gv, SheetCtx *c, const int *values, int count) {
   c->chip_first = gv->count;
   c->chip_count = count;
   c->chip_sel = 0;
-  c->chip_duration = duration;
   Rect cells[CHIP_MAX];
   layout_grid((Rect){ 2, CHIP_Y, SCREEN_W - 4, CHIP_H }, count, 1, 4, cells);
   for (int i = 0; i < count; i++) {
     char label[12];
     c->chip_values[i] = values[i];
-    if (duration) {
-      if (values[i] == 0) snprintf(label, sizeof(label), "--");
-      else snprintf(label, sizeof(label), "%dm", values[i]);
-    } else {
-      fmt_backdate(label, sizeof(label), values[i]);
-    }
+    fmt_backdate(label, sizeof(label), values[i]);
     GridCell *cell = grid_view_add(gv, CELL_CHIP, cells[i], label, "", "", GColorLightGray);
     cell->selected = i == 0;
   }
@@ -62,8 +55,8 @@ static void add_chips(GridView *gv, SheetCtx *c, const int *values, int count, b
 static void add_offset_chips(GridView *gv, SheetCtx *c) {
   static const int normal[4] = { 0, 5, 15, 30 };
   static const int later[5] = { 5, 10, 15, 30, 60 };
-  if (c->backdate) add_chips(gv, c, later, 5, false);
-  else add_chips(gv, c, normal, 4, false);
+  if (c->backdate) add_chips(gv, c, later, 5);
+  else add_chips(gv, c, normal, 4);
 }
 
 static bool chip_select(GridView *gv, int index) {
@@ -76,11 +69,7 @@ static bool chip_select(GridView *gv, int index) {
 }
 
 static int minutes_ago(const SheetCtx *c) {
-  return (c->chip_count > 0 && !c->chip_duration) ? c->chip_values[c->chip_sel] : 0;
-}
-
-static int duration_min(const SheetCtx *c) {
-  return (c->chip_count > 0 && c->chip_duration) ? c->chip_values[c->chip_sel] : 0;
+  return (c->chip_count > 0) ? c->chip_values[c->chip_sel] : 0;
 }
 
 // ---- opening ----
@@ -189,36 +178,6 @@ void sheet_timer_start(int action, bool backdate) {
   c->btn_first = gv->count;
   grid_view_add(gv, CELL_BUTTON, (Rect){ 2, CONTENT_Y + 20, SCREEN_W - 4, 100 },
                 action == ACTION_SLEEP ? "Start sleep" : "Start pump", "", "", ui_action_color(action));
-  show_sheet(gv);
-}
-
-// ---- activity ----
-
-static void activity_activate(GridView *gv, int index, bool long_press) {
-  if (chip_select(gv, index)) return;
-  SheetCtx *c = ctx_of(gv);
-  int k = index - c->btn_first;
-  if (k < 0 || k >= ACTIVITY_COMMON_COUNT) return;
-  int activity = model_activity_common(k);
-  ui_send(ACTION_ACTIVITY, model_activity_label(activity), CMD_LOG_ACTIVITY, activity, duration_min(c), minutes_ago(c), 0);
-}
-
-void sheet_activity(bool backdate) {
-  GridView *gv = open_sheet("Activity", ACTION_ACTIVITY, backdate, activity_activate);
-  if (!gv) return;
-  SheetCtx *c = ctx_of(gv);
-  if (backdate) {
-    add_offset_chips(gv, c);
-  } else {
-    static const int durations[5] = { 0, 5, 10, 20, 30 };
-    add_chips(gv, c, durations, 5, true);
-  }
-  c->btn_first = gv->count;
-  Rect cells[10];
-  layout_grid((Rect){ 2, CONTENT_Y, SCREEN_W - 4, SCREEN_H - CONTENT_Y - 2 }, 2, 5, 3, cells);
-  for (int i = 0; i < ACTIVITY_COMMON_COUNT; i++) {
-    grid_view_add(gv, CELL_BUTTON, cells[i], model_activity_label(model_activity_common(i)), "", "", ui_action_color(ACTION_ACTIVITY));
-  }
   show_sheet(gv);
 }
 

@@ -14,7 +14,7 @@ const DEFAULTS = Object.freeze({
   units: 'oz',
   baseUrl: 'https://api.nappi.app',
   // Visible tiles in grid order (Status is always appended last by the state builder).
-  layout: Object.freeze(['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty', 'activity']),
+  layout: Object.freeze(['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']),
   // Empty means "use DEFAULT_PRESETS for the current units".
   bottlePresets: Object.freeze([]),
   defaultBottleType: 'formula',

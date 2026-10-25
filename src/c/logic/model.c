@@ -8,7 +8,7 @@ void model_default(WatchState *s) {
   s->units = UNITS_OZ;
   static const uint8_t layout[] = {
     ACTION_DIAPER, ACTION_BOTTLE, ACTION_NURSING, ACTION_SLEEP,
-    ACTION_PUMP, ACTION_POTTY, ACTION_ACTIVITY, ACTION_STATUS
+    ACTION_PUMP, ACTION_POTTY, ACTION_STATUS
   };
   memcpy(s->layout, layout, sizeof(layout));
   s->layout_count = sizeof(layout);
@@ -46,7 +46,7 @@ static const char *pick(const char *const *table, int count, int i) {
 }
 
 const char *model_action_title(int action) {
-  static const char *const t[] = { "DIAPER", "BOTTLE", "NURSING", "SLEEP", "PUMP", "POTTY", "ACTIVITY", "STATUS" };
+  static const char *const t[] = { "DIAPER", "BOTTLE", "NURSING", "SLEEP", "PUMP", "POTTY", "STATUS" };
   return pick(t, ACTION_COUNT, action);
 }
 
@@ -70,23 +70,6 @@ const char *model_bottle_type_label(int type) {
     "Formula", "Breast milk", "Tube feeding", "Cow milk", "Goat milk", "Soy milk", "Other"
   };
   return pick(t, 7, type);
-}
-
-const char *model_activity_label(int index) {
-  static const char *const t[ACTIVITY_COUNT] = {
-    "Bath", "Tummy time", "Story time", "Play", "Outdoor", "Screen time", "Skin to skin", "Spit up",
-    "Brush teeth", "Skin care", "Massage", "Reading", "Doctor", "Hospital", "Mouth exercises",
-    "Physio", "Nebulizer", "Stretches", "Tummy upset"
-  };
-  return pick(t, ACTIVITY_COUNT, index);
-}
-
-int model_activity_common(int i) {
-  static const int common[ACTIVITY_COMMON_COUNT] = {
-    ACTIVITY_BATH, ACTIVITY_TUMMY_TIME, ACTIVITY_PLAY, ACTIVITY_OUTDOOR, ACTIVITY_STORY_TIME,
-    ACTIVITY_READING, ACTIVITY_MASSAGE, ACTIVITY_BRUSH_TEETH, ACTIVITY_SKIN_TO_SKIN
-  };
-  return (i >= 0 && i < ACTIVITY_COMMON_COUNT) ? common[i] : ACTIVITY_BATH;
 }
 
 // ---- status ----
@@ -145,9 +128,6 @@ static void detail_line(const WatchState *s, int action, char *out, size_t n) {
       break;
     case ACTION_POTTY:
       if (info > 0) snprintf(out, n, "%s", model_potty_label((int)info - 1));
-      break;
-    case ACTION_ACTIVITY:
-      if (info > 0) snprintf(out, n, "%s", model_activity_label((int)info - 1));
       break;
     default:
       break;

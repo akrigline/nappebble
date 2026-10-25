@@ -15,7 +15,7 @@ const byKey = (config, key) => {
 };
 
 test('new settings default to spec layout, no custom presets, formula, stay-open', () => {
-  assert.deepEqual(DEFAULTS.layout, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty', 'activity']);
+  assert.deepEqual(DEFAULTS.layout, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']);
   assert.deepEqual(DEFAULTS.bottlePresets, []);
   assert.equal(DEFAULTS.defaultBottleType, 'formula');
   assert.equal(DEFAULTS.exitAfterLog, false);
@@ -37,14 +37,14 @@ test('layout and presets persist', () => {
 
 test('the config page has a position picker per action, prefilled from the saved layout', () => {
   const config = buildConfig({ settings: Object.assign({}, DEFAULTS, { layout: ['sleep', 'diaper'] }), babies: [] });
-  assert.deepEqual(ACTION_ORDER, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty', 'activity']);
+  assert.deepEqual(ACTION_ORDER, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']);
   ACTION_ORDER.forEach((a) => assert.equal(byKey(config, 'pos_' + a).type, 'select', a));
   assert.equal(byKey(config, 'pos_sleep').defaultValue, '1');
   assert.equal(byKey(config, 'pos_diaper').defaultValue, '2');
   assert.equal(byKey(config, 'pos_bottle').defaultValue, '0', 'hidden');
   const labels = byKey(config, 'pos_sleep').options.map((o) => o.label);
   assert.equal(labels[0], 'Hidden');
-  assert.equal(labels.length, 8);
+  assert.equal(labels.length, 7);
 });
 
 test('the config page has presets, default bottle type and exit-after-log', () => {
@@ -69,9 +69,17 @@ test('blank custom presets show the unit defaults as a hint, not as saved values
 test('positions in the response become the ordered layout, hidden ones dropped', () => {
   const patch = settingsFromClayResponse({
     pos_diaper: { value: '3' }, pos_bottle: { value: '0' }, pos_nursing: { value: '1' }, pos_sleep: { value: '2' },
-    pos_pump: { value: '0' }, pos_potty: { value: '0' }, pos_activity: { value: '4' },
+    pos_pump: { value: '0' }, pos_potty: { value: '4' },
   });
-  assert.deepEqual(patch.layout, ['nursing', 'sleep', 'diaper', 'activity']);
+  assert.deepEqual(patch.layout, ['nursing', 'sleep', 'diaper', 'potty']);
+});
+
+test('activity is gone from the config page and from responses', () => {
+  const config = buildConfig({ settings: Object.assign({}, DEFAULTS, { layout: ['diaper', 'activity'] }), babies: [] });
+  assert.equal(byKey(config, 'pos_activity'), undefined);
+  const patch = settingsFromClayResponse({ pos_diaper: { value: '1' }, pos_activity: { value: '1' } });
+  assert.deepEqual(patch.layout, ['diaper']);
+  assert.equal((settingsFromClayResponse({ pos_activity: { value: '1' } }).layout || []).includes('activity'), false);
 });
 
 test('equal positions fall back to the default order', () => {

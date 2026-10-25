@@ -8,7 +8,6 @@
 
 #define BABY_NAME_LEN 24
 #define BABY_NAMES_LEN 96
-#define ACTIVITY_COMMON_COUNT 9
 
 typedef struct {
   uint8_t status;
@@ -50,8 +49,6 @@ const char *model_diaper_label(int type);
 const char *model_potty_label(int outcome);
 const char *model_side_label(int side);
 const char *model_bottle_type_label(int type);
-const char *model_activity_label(int index);
-int model_activity_common(int i);                          // i in 0..ACTIVITY_COMMON_COUNT-1
 
 // The two text lines on a home tile (timer clock when one is active).
 void model_tile_lines(const WatchState *s, int action, int32_t now,

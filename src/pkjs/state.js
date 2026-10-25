@@ -68,10 +68,6 @@ function summarise(action, latest, units) {
       const e = latest.potty;
       return e ? [seconds(e.time), P.POTTY_OUTCOMES.indexOf(e.outcome) + 1] : [0, 0];
     }
-    case P.ACTION.ACTIVITY: {
-      const e = latest.activity;
-      return e ? [seconds(e.time), P.ACTIVITY_TYPES.indexOf(e.activity_type) + 1] : [0, 0];
-    }
     default:
       return [0, 0];
   }

@@ -59,12 +59,13 @@ test('settings are echoed as small ints', () => {
 
 test('the default layout is the spec order with Status pinned last', () => {
   assert.deepEqual(buildState(view()).LAYOUT, [
-    P.ACTION.DIAPER, P.ACTION.BOTTLE, P.ACTION.NURSING, P.ACTION.SLEEP, P.ACTION.PUMP, P.ACTION.POTTY, P.ACTION.ACTIVITY, P.ACTION.STATUS,
+    P.ACTION.DIAPER, P.ACTION.BOTTLE, P.ACTION.NURSING, P.ACTION.SLEEP, P.ACTION.PUMP, P.ACTION.POTTY, P.ACTION.STATUS,
   ]);
 });
 
 test('layoutIds honours order and visibility, drops unknown names and duplicates, pins Status last', () => {
   assert.deepEqual(layoutIds(['sleep', 'diaper', 'bogus', 'sleep']), [P.ACTION.SLEEP, P.ACTION.DIAPER, P.ACTION.STATUS]);
+  assert.deepEqual(layoutIds(['diaper', 'activity', 'bottle']), [P.ACTION.DIAPER, P.ACTION.BOTTLE, P.ACTION.STATUS]);
   assert.deepEqual(layoutIds([]), [P.ACTION.STATUS]);
   assert.deepEqual(layoutIds(['status', 'diaper']), [P.ACTION.DIAPER, P.ACTION.STATUS]);
 });
@@ -88,7 +89,8 @@ test('LAST holds epoch seconds per action, 0 when there is nothing', () => {
       nursing: null,
     },
   }));
-  assert.equal(s.LAST.length, P.ACTION.STATUS + 1);
+  assert.equal(s.LAST.length, 7);
+  assert.equal(P.ACTION.STATUS + 1, 7);
   assert.equal(s.LAST[P.ACTION.DIAPER], sec('2026-10-24T17:00:00Z'));
   assert.equal(s.LAST[P.ACTION.BOTTLE], sec('2026-10-24T16:00:00Z'));
   assert.equal(s.LAST[P.ACTION.SLEEP], sec('2026-10-24T15:12:00Z'), 'sleep uses the end time');
@@ -106,7 +108,6 @@ test('INFO carries the small detail each tile shows', () => {
       sleep: { id: '4', start_time: '2026-10-24T14:00:00Z', end_time: '2026-10-24T15:12:00Z', duration_minutes: 72, sleep_type: 'nap' },
       pumping: { id: '5', time: '2026-10-24T13:00:00Z', duration_minutes: 15, total_amount_ml: 88.7, left_amount_ml: null, right_amount_ml: null },
       potty: { id: '6', time: '2026-10-24T12:00:00Z', outcome: 'accident' },
-      activity: { id: '7', time: '2026-10-24T11:00:00Z', activity_type: 'tummy_time', duration_minutes: null },
     },
   }));
   assert.equal(s.INFO[P.ACTION.DIAPER], P.DIAPER.POO + 1);
@@ -115,7 +116,7 @@ test('INFO carries the small detail each tile shows', () => {
   assert.equal(s.INFO[P.ACTION.SLEEP], 72);
   assert.equal(s.INFO[P.ACTION.PUMP], 30);
   assert.equal(s.INFO[P.ACTION.POTTY], P.POTTY.ACCIDENT + 1);
-  assert.equal(s.INFO[P.ACTION.ACTIVITY], P.ACTIVITY_TYPES.indexOf('tummy_time') + 1);
+  assert.equal(s.INFO.length, 7);
 });
 
 test('INFO bottle amount follows the unit setting', () => {

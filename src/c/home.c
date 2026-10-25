@@ -57,7 +57,6 @@ static void open_action(int action, bool long_press) {
     case ACTION_DIAPER: sheet_diaper(long_press); break;
     case ACTION_BOTTLE: sheet_bottle(long_press); break;
     case ACTION_POTTY: sheet_potty(long_press); break;
-    case ACTION_ACTIVITY: sheet_activity(long_press); break;
     case ACTION_STATUS: sheet_status(); break;
     case ACTION_NURSING:
       if (active) timer_view_open(timer);

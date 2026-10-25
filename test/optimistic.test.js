@@ -30,11 +30,9 @@ test('a bottle converts to ml the way the API reports it', () => {
   assert.equal(view.latest.bottle.bottle_type, 'formula');
 });
 
-test('potty and activity entries are reflected', () => {
+test('potty entries are reflected', () => {
   let view = applyJob(empty(), { kind: 'entry', babyId: BABY, body: { type: 'potty', outcome: 'sat_dry' } }, ctx);
-  view = applyJob(view, { kind: 'entry', babyId: BABY, body: { type: 'activity', activity_type: 'bath', duration_minutes: 10 } }, ctx);
   assert.equal(view.latest.potty.outcome, 'sat_dry');
-  assert.equal(view.latest.activity.activity_type, 'bath');
 });
 
 test('starting a timer adds it, honouring a backdated start', () => {

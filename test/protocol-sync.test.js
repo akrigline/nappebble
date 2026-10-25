@@ -45,14 +45,6 @@ Object.keys(GROUPS).forEach((group) => {
   });
 });
 
-test('protocol.h lists every activity type at its API index', () => {
-  const c = defines();
-  P.ACTIVITY_TYPES.forEach((type, index) => {
-    assert.equal(c['ACTIVITY_' + type.toUpperCase()], index, type);
-  });
-  assert.equal(c.ACTIVITY_COUNT, P.ACTIVITY_TYPES.length);
-});
-
 test('protocol.h counts match the array sizes in the message keys', () => {
   const c = defines();
   assert.equal(c.PRESET_COUNT, P.PRESET_COUNT);

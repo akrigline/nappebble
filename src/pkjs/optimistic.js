@@ -46,11 +46,6 @@ function applyEntry(view, body, ctx) {
     case 'potty':
       putLatest(view, 'potty', { id: PENDING, time, outcome: body.outcome });
       break;
-    case 'activity':
-      putLatest(view, 'activity', {
-        id: PENDING, time, activity_type: body.activity_type, duration_minutes: value(body.duration_minutes)
-      });
-      break;
     default:
       break;
   }

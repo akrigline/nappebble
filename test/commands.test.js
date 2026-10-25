@@ -44,11 +44,12 @@ test('a backdated bottle carries time as well', () => {
   assert.equal(job.body.time, '2026-10-24T14:30:00-04:00');
 });
 
-test('potty and activity map their enums; activity omits a zero duration', () => {
+test('potty maps its enum', () => {
   assert.equal(one({ CMD: P.CMD.LOG_POTTY, ARG1: P.POTTY.ACCIDENT, ARG2: 0 }).body.outcome, 'accident');
-  const a = one({ CMD: P.CMD.LOG_ACTIVITY, ARG1: 1, ARG2: 0, ARG3: 0 });
-  assert.deepEqual(a.body, { type: 'activity', activity_type: 'tummy_time' });
-  assert.equal(one({ CMD: P.CMD.LOG_ACTIVITY, ARG1: 0, ARG2: 20, ARG3: 0 }).body.duration_minutes, 20);
+});
+
+test('command 5 (the retired activity log) is unknown', () => {
+  assert.throws(() => jobsFor({ CMD: 5, CMD_ID: 1, ARG1: 0 }, ctx), (err) => err instanceof BadCommand && err.message === 'unknown command: 5');
 });
 
 test('starting a sleep timer has no body; backdating sets start_time', () => {
@@ -97,7 +98,6 @@ test('bad arguments are rejected rather than sent to the API', () => {
     { CMD: P.CMD.LOG_DIAPER, ARG1: 0, ARG2: 3000 },
     { CMD: P.CMD.LOG_BOTTLE, ARG1: 20000, ARG2: 0, ARG3: 0 },
     { CMD: P.CMD.LOG_POTTY, ARG1: 7, ARG2: 0 },
-    { CMD: P.CMD.LOG_ACTIVITY, ARG1: 99, ARG2: 0, ARG3: 0 },
     { CMD: P.CMD.TIMER_START, ARG1: 5, ARG2: 0, ARG3: 0 },
     { CMD: P.CMD.TIMER_STOP, ARG1: 5, ARG2: 0, ARG3: 0 },
     { CMD: P.CMD.TIMER_SWITCH, ARG1: P.SIDE.NONE },

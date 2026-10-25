@@ -17,7 +17,6 @@ GColor ui_action_color(int action) {
     case ACTION_SLEEP: return GColorIndigo;
     case ACTION_PUMP: return GColorTiffanyBlue;
     case ACTION_POTTY: return GColorMayGreen;
-    case ACTION_ACTIVITY: return GColorOrange;
     default: return GColorLightGray;
   }
 }

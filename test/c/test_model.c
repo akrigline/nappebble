@@ -16,9 +16,10 @@ TEST(default_state_has_no_data_and_the_spec_layout) {
   model_default(&s);
   CHECK(!s.has_data);
   CHECK_INT(s.units, UNITS_OZ);
-  CHECK_INT(s.layout_count, 8);
+  CHECK_INT(ACTION_COUNT, 7);
+  CHECK_INT(s.layout_count, 7);
   CHECK_INT(s.layout[0], ACTION_DIAPER);
-  CHECK_INT(s.layout[7], ACTION_STATUS);
+  CHECK_INT(s.layout[6], ACTION_STATUS);
   CHECK_INT(s.preset[0], 20);
   CHECK_INT(s.preset[5], 70);
   CHECK_INT(s.baby_count, 0);
@@ -77,20 +78,6 @@ TEST(titles_and_labels) {
   CHECK_STR(model_diaper_label(9), "?");
 }
 
-TEST(every_activity_has_a_label_and_the_common_grid_is_valid) {
-  for (int i = 0; i < ACTIVITY_COUNT; i++) CHECK(model_activity_label(i)[0] != '\0');
-  CHECK_STR(model_activity_label(ACTIVITY_TUMMY_TIME), "Tummy time");
-  CHECK_STR(model_activity_label(99), "?");
-  bool seen[ACTIVITY_COUNT] = { false };
-  for (int i = 0; i < ACTIVITY_COMMON_COUNT; i++) {
-    int a = model_activity_common(i);
-    CHECK(a >= 0 && a < ACTIVITY_COUNT);
-    CHECK(!seen[a]);
-    seen[a] = true;
-  }
-  CHECK_INT(model_activity_common(0), ACTIVITY_BATH);
-}
-
 TEST(idle_tile_shows_how_long_ago_and_the_detail) {
   WatchState s = fresh();
   char l1[24], l2[24];
@@ -122,10 +109,6 @@ TEST(idle_tile_shows_how_long_ago_and_the_detail) {
   s.last[ACTION_POTTY] = NOW - 60; s.info[ACTION_POTTY] = POTTY_ACCIDENT + 1;
   model_tile_lines(&s, ACTION_POTTY, NOW, l1, sizeof l1, l2, sizeof l2);
   CHECK_STR(l2, "Accident");
-
-  s.last[ACTION_ACTIVITY] = NOW - 60; s.info[ACTION_ACTIVITY] = ACTIVITY_TUMMY_TIME + 1;
-  model_tile_lines(&s, ACTION_ACTIVITY, NOW, l1, sizeof l1, l2, sizeof l2);
-  CHECK_STR(l2, "Tummy time");
 }
 
 TEST(a_tile_with_no_history_shows_dashes) {
@@ -247,7 +230,6 @@ int main(void) {
   RUN(timer_active_means_running_or_paused);
   RUN(actions_map_to_their_timers);
   RUN(titles_and_labels);
-  RUN(every_activity_has_a_label_and_the_common_grid_is_valid);
   RUN(idle_tile_shows_how_long_ago_and_the_detail);
   RUN(a_tile_with_no_history_shows_dashes);
   RUN(a_running_timer_replaces_the_tile_text_with_its_clock);

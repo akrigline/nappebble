@@ -29,11 +29,11 @@ test('array-declared keys expand to consecutive numeric keys', () => {
 test('every array key in the protocol expands with the declared length', () => {
   const ids = fakeIds();
   const dict = {
-    PRESET: new Array(6).fill(1), LAST: new Array(8).fill(2), INFO: new Array(8).fill(3),
+    PRESET: new Array(6).fill(1), LAST: new Array(7).fill(2), INFO: new Array(7).fill(3),
     TIMER_STATE: [0, 0, 0], TIMER_ELAPSED: [0, 0, 0], TIMER_SIDE: [0, 0, 0],
   };
   const wire = toWire(dict, ids);
-  assert.equal(Object.keys(wire).length, 6 + 8 + 8 + 3 + 3 + 3);
+  assert.equal(Object.keys(wire).length, 6 + 7 + 7 + 3 + 3 + 3);
 });
 
 test('LAYOUT is a single byte-array value, not expanded', () => {

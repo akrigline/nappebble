@@ -22,7 +22,7 @@ const P = require('./protocol');
 const CACHE_KEY = 'nappi.cache';
 const MIN_REFRESH_MS = 60 * 1000;
 const REREAD_DELAY_MS = 4000;
-const LATEST_TYPES = ['sleep', 'nursing', 'bottle', 'diaper', 'potty', 'pumping', 'activity'];
+const LATEST_TYPES = ['sleep', 'nursing', 'bottle', 'diaper', 'potty', 'pumping'];
 
 function emptyCache() {
   return { babies: [], perBaby: {}, others: {} };

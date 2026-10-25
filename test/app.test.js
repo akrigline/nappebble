@@ -25,7 +25,7 @@ test('a first start reads babies, latest and timers, and sends the full state', 
   assert.equal(s.STATUS, P.STATUS.OK);
   assert.equal(s.BABY_NAME, 'Phoebe');
   assert.equal(s.BABY_COUNT, 1);
-  assert.equal(s.LAST.length, 8);
+  assert.equal(s.LAST.length, 7);
   assert.equal(h.settings.get().babyId, PHOEBE.id);
 });
 
@@ -34,7 +34,7 @@ test('the latest request asks only for the types the tiles need', async () => {
   await h.app.start();
   const latest = h.reads().find((r) => r.url.includes('/entries/latest'));
   const types = new URL(latest.url).searchParams.get('types').split(',').sort();
-  assert.deepEqual(types, ['activity', 'bottle', 'diaper', 'nursing', 'potty', 'pumping', 'sleep']);
+  assert.deepEqual(types, ['bottle', 'diaper', 'nursing', 'potty', 'pumping', 'sleep']);
 });
 
 test('a second start uses the cached babies, so launch costs two reads', async () => {

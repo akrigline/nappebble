@@ -21,15 +21,13 @@ const ACTION = Object.freeze({
   SLEEP: 3,
   PUMP: 4,
   POTTY: 5,
-  ACTIVITY: 6,
-  STATUS: 7,
+  STATUS: 6,
 });
 
 // Watch -> phone commands (CMD key, with ARG1..ARG4 and a CMD_ID echoed in the ACK).
 //   LOG_DIAPER    ARG1 DIAPER_*, ARG2 minutes ago
 //   LOG_BOTTLE    ARG1 amount x10 (in the current UNITS), ARG2 BOTTLE_TYPE_*, ARG3 minutes ago
 //   LOG_POTTY     ARG1 POTTY_*, ARG2 minutes ago
-//   LOG_ACTIVITY  ARG1 ACTIVITY_* index, ARG2 duration minutes (0 none), ARG3 minutes ago
 //   TIMER_START   ARG1 TIMER_*, ARG2 SIDE_*, ARG3 minutes ago
 //   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (0 none)
 //   TIMER_SWITCH  ARG1 new SIDE_* (stop the nursing timer, start the other side)
@@ -39,7 +37,7 @@ const CMD = Object.freeze({
   LOG_DIAPER: 2,
   LOG_BOTTLE: 3,
   LOG_POTTY: 4,
-  LOG_ACTIVITY: 5,
+  // 5 was LOG_ACTIVITY, removed from the watch app; left unused.
   TIMER_START: 6,
   TIMER_STOP: 7,
   SWITCH_BABY: 8,
@@ -56,13 +54,6 @@ const BOTTLE_TYPES = ['formula', 'breast_milk', 'tube_feeding', 'cow_milk', 'goa
 
 const POTTY = Object.freeze({ POTTY: 0, ACCIDENT: 1, SAT_DRY: 2 });
 const POTTY_OUTCOMES = ['potty', 'accident', 'sat_dry'];
-
-// Order is the API's activity_type enum; the watch sends the index.
-const ACTIVITY_TYPES = [
-  'bath', 'tummy_time', 'story_time', 'play', 'outdoor', 'screen_time', 'skin_to_skin', 'spit_up',
-  'brush_teeth', 'skin_care', 'massage', 'reading', 'doctor_visit', 'hospitalization', 'mouth_exercises',
-  'physical_therapy', 'nebulizer', 'stretches', 'digestive_discomfort',
-];
 
 const TIMER = Object.freeze({ SLEEP: 0, NURSING: 1, PUMPING: 2 });
 const TIMER_TYPES = ['sleep', 'nursing', 'pumping'];
@@ -124,6 +115,6 @@ function describeError(err) {
 
 module.exports = {
   STATUS, statusMessage, describeError,
-  ACTION, CMD, DIAPER, DIAPER_TYPES, BOTTLE_TYPE, BOTTLE_TYPES, POTTY, POTTY_OUTCOMES, ACTIVITY_TYPES,
+  ACTION, CMD, DIAPER, DIAPER_TYPES, BOTTLE_TYPE, BOTTLE_TYPES, POTTY, POTTY_OUTCOMES,
   TIMER, TIMER_TYPES, TIMER_STATE, SIDE, UNITS, PRESET_COUNT, MESSAGE_KEYS,
 };

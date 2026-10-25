@@ -7,7 +7,6 @@
 void sheet_diaper(bool backdate);
 void sheet_potty(bool backdate);
 void sheet_bottle(bool backdate);
-void sheet_activity(bool backdate);
 void sheet_nursing_start(bool backdate);
 void sheet_timer_start(int action, bool backdate);   // sleep or pump, backdated start
 void sheet_pump_amount(void);                        // after stopping a pump timer
