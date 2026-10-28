@@ -11,6 +11,10 @@ const STATUS = Object.freeze({
   RATE_LIMITED: 6,
   NO_BABY: 7,
   ERROR: 8,
+  // Only ever seen in an ACK_STATUS. ACK_ID 0 with REJECTED is the phone telling the
+  // watch that nappi refused a write it had already confirmed.
+  REJECTED: 9,
+  WRONG_BABY: 10,
 });
 
 // Tile actions. The watch's layout is a list of these ids; STATUS is pinned last.
@@ -25,6 +29,8 @@ const ACTION = Object.freeze({
 });
 
 // Watch -> phone commands (CMD key, with ARG1..ARG4 and a CMD_ID echoed in the ACK).
+// Every write also carries BABY_INDEX, the baby the watch is showing; the phone
+// refuses it (ACK WRONG_BABY) if that is no longer the active baby.
 //   LOG_DIAPER    ARG1 DIAPER_*, ARG2 minutes ago
 //   LOG_BOTTLE    ARG1 amount x10, ARG2 BOTTLE_TYPE_*, ARG3 minutes ago,
 //                 ARG4 UNITS_* the amount is in (absent or invalid: the saved bottle units)
@@ -33,6 +39,7 @@ const ACTION = Object.freeze({
 //   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (0 none),
 //                 ARG4 UNITS_* the amount is in (absent or invalid: the saved pump units)
 //   TIMER_SWITCH  ARG1 new SIDE_* (stop the nursing timer, start the other side)
+//   REFRESH       ARG1 1 to bypass the once-a-minute throttle (the Status sheet's button)
 //   SWITCH_BABY   ARG1 baby index
 //   SET_UNITS     ARG1 UNITS_SCREEN_*, ARG2 UNITS_* (the unit that screen shows and logs in)
 const CMD = Object.freeze({

@@ -8,8 +8,8 @@ const { resolveActiveBaby } = require('./babies');
 const NO_BABIES_HINT = 'Enter your API token and save, then reopen these settings to choose a baby. ' +
   'Create a token at nappi.app/app/connections.';
 
-// Default grid order; also the tie-break when two tiles share a position.
-const ACTION_ORDER = ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty'];
+// Default grid order (nappi's own: Sleep, Nursing, Bottle, Diaper, then ours); also the tie-break when two tiles share a position.
+const ACTION_ORDER = ['sleep', 'nursing', 'bottle', 'diaper', 'pump', 'potty'];
 const ACTION_LABELS = {
   diaper: 'Diaper', bottle: 'Bottle', nursing: 'Nursing', sleep: 'Sleep', pump: 'Pump', potty: 'Potty'
 };
@@ -32,7 +32,7 @@ function buildConfig(options) {
   const babies = options.babies;
 
   const items = [
-    { type: 'heading', defaultValue: 'nappi' },
+    { type: 'heading', defaultValue: 'nappebble' },
     {
       type: 'input',
       messageKey: 'token',

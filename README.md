@@ -1,6 +1,6 @@
-# pebble-nappi
+# nappebble
 
-Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `../docs/pebble-nappi-spec-v2.md`. API notes: `../docs/nappi-api.md`. What is built, what differs from the spec, and what is unverified: `docs/implementation-notes.md`.
+Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `../docs/nappebble-spec-v2.md`. API notes: `../docs/nappi-api.md`. What is built, what differs from the spec, and what is unverified: `docs/implementation-notes.md`.
 
 ## Commands
 
@@ -29,6 +29,7 @@ Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bot
 - `src/c/logic/` the watch's decisions as plain C (formatting, geometry, touch gestures, lockout, strips, tile text), unit-tested on the host with gcc.
 - `src/c/` the Pebble UI: one reusable `GridView` window drives Home and every sheet.
 - `src/pkjs/protocol.js` is the source of truth for enums and message keys; `src/c/logic/protocol.h` and `package.json` must match, and a test enforces it.
+- `art/icons/*.svg` are the nappi app's 24px tile icons; `node tools/make-icons.js` (after `npm i --no-save @resvg/resvg-js pngjs`) renders them to the 1-bit PNGs in `resources/icons/`. `grid_view.c` recolours them to each tile's text colour.
 - `test/support/` mock nappi API (`mock-nappi.js`), engine harness, HTTP wrapper and dev server.
 
 ## Gotchas

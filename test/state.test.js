@@ -59,9 +59,9 @@ test('settings are echoed as small ints', () => {
   assert.equal(buildState(view()).EXIT_AFTER_LOG, 0);
 });
 
-test('the default layout is the spec order with Status pinned last', () => {
+test('the default layout follows the nappi app with Status pinned last', () => {
   assert.deepEqual(buildState(view()).LAYOUT, [
-    P.ACTION.DIAPER, P.ACTION.BOTTLE, P.ACTION.NURSING, P.ACTION.SLEEP, P.ACTION.PUMP, P.ACTION.POTTY, P.ACTION.STATUS,
+    P.ACTION.SLEEP, P.ACTION.NURSING, P.ACTION.BOTTLE, P.ACTION.DIAPER, P.ACTION.PUMP, P.ACTION.POTTY, P.ACTION.STATUS,
   ]);
 });
 

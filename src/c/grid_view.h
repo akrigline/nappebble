@@ -28,6 +28,7 @@ typedef struct {
   char l1[100];
   char l2[24];
   GColor bg, fg;
+  uint32_t icon;      // CELL_TILE: bitmap resource id drawn top left, 0 for none
   bool selected;
   bool enabled;
   uint8_t font;       // CELL_TEXT: FONT_BODY, FONT_VALUE or FONT_CLOCK
@@ -63,7 +64,7 @@ struct GridView {
   void *ctx;                 // owned by the creator; freed in on_unload
   int page, pages;
   int tick_secs;             // 0, 1 or 60
-  int overlay;               // 0 none, 1 check, 2 message
+  int overlay;               // 0 none, 1 check, 2 error banner, 3 neutral notice
   char message[40];
   AppTimer *overlay_timer;
   void (*overlay_done)(GridView *gv);
@@ -89,7 +90,8 @@ void grid_view_focus(GridView *gv, int index);
 // first_cell; on_activate gets the absolute cell index of a chosen item.
 void grid_view_set_zones(GridView *gv, const NavZone *zones, const int *first_cell, const int *cell_count, int count);
 
-// 1 = checkmark with `message` as its caption, 2 = error banner. `done` runs when it expires.
+// 1 = checkmark with `message` as its caption, 2 = error banner, 3 = neutral notice
+// ("Sending..."). Input is ignored while one shows. `done` runs when it expires.
 void grid_view_flash(GridView *gv, int kind, const char *message, int ms, void (*done)(GridView *gv));
 
 GridView *grid_view_top(void);

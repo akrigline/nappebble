@@ -46,7 +46,7 @@ static const char *pick(const char *const *table, int count, int i) {
 }
 
 const char *model_action_title(int action) {
-  static const char *const t[] = { "DIAPER", "BOTTLE", "NURSING", "SLEEP", "PUMP", "POTTY", "STATUS" };
+  static const char *const t[] = { "Diaper", "Bottle", "Nursing", "Sleep", "Pump", "Potty", "Status" };
   return pick(t, ACTION_COUNT, action);
 }
 

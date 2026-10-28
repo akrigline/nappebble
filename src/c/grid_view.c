@@ -4,6 +4,7 @@
 
 #define MAX_LIVE_VIEWS 8
 #define CORNER 6
+#define TILE_CORNER 12
 
 static GridView *s_live[MAX_LIVE_VIEWS];
 static GridView *s_top;
@@ -35,6 +36,41 @@ static void draw_text(GContext *ctx, const char *text, const char *font, GRect b
   if (!text[0]) return;
   graphics_context_set_text_color(ctx, color);
   graphics_draw_text(ctx, text, fonts_get_system_font(font), box, GTextOverflowModeTrailingEllipsis, align, NULL);
+}
+
+// Icons are tiny 1-bit-palette bitmaps, loaded on first use and kept for the life of the app.
+#define ICON_SIZE 24
+#define ICON_CACHE 8
+static struct { uint32_t res; GBitmap *bmp; } s_icons[ICON_CACHE];
+
+static GBitmap *icon_bitmap(uint32_t res) {
+  for (int i = 0; i < ICON_CACHE; i++) {
+    if (s_icons[i].res == res) return s_icons[i].bmp;
+    if (!s_icons[i].res) {
+      s_icons[i].res = res;
+      s_icons[i].bmp = gbitmap_create_with_resource(res);
+      return s_icons[i].bmp;
+    }
+  }
+  return NULL;
+}
+
+// The bitmap's opaque palette entry is its ink: recolour it to the tile's text colour.
+static void draw_icon(GContext *ctx, uint32_t res, int x, int y, GColor ink) {
+  GBitmap *bmp = icon_bitmap(res);
+  if (!bmp) return;
+  GColor *palette = gbitmap_get_palette(bmp);
+  if (palette) {
+    for (int i = 0; i < 2; i++) {
+      if (palette[i].a) palette[i] = ink;
+    }
+  }
+  graphics_context_set_compositing_mode(ctx, GCompOpSet);
+  graphics_draw_bitmap_in_rect(ctx, bmp, GRect(x, y, ICON_SIZE, ICON_SIZE));
+}
+
+static int corner_of(const GridCell *c) {
+  return c->kind == CELL_TILE ? TILE_CORNER : CORNER;
 }
 
 static void draw_cell(GContext *ctx, const GridView *gv, int i) {
@@ -70,7 +106,7 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
   }
 
   graphics_context_set_fill_color(ctx, bg);
-  graphics_fill_rect(ctx, grect(r), c->kind == CELL_HEADER ? 0 : CORNER, c->kind == CELL_HEADER ? GCornerNone : GCornersAll);
+  graphics_fill_rect(ctx, grect(r), c->kind == CELL_HEADER ? 0 : corner_of(c), c->kind == CELL_HEADER ? GCornerNone : GCornersAll);
 
   if (c->kind == CELL_HEADER) {
     draw_text(ctx, c->l1, FONT_KEY_GOTHIC_18_BOLD, GRect(r.x + 6, r.y, r.w - 60, r.h), GTextAlignmentLeft, fg);
@@ -93,9 +129,11 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
     graphics_context_set_fill_color(ctx, GColorBlack);
     graphics_fill_circle(ctx, GPoint(strip_x_for(&c->geom, c->strip_value), track_y), 8);
   } else if (c->kind == CELL_TILE) {
-    draw_text(ctx, c->title, FONT_KEY_GOTHIC_14_BOLD, inset(r, 6, 4, 16), GTextAlignmentLeft, fg);
-    draw_text(ctx, c->l1, FONT_KEY_GOTHIC_24_BOLD, inset(r, 6, 30, 30), GTextAlignmentLeft, fg);
-    draw_text(ctx, c->l2, FONT_KEY_GOTHIC_18, inset(r, 6, 62, 24), GTextAlignmentLeft, fg);
+    // Laid out like the nappi app's tiles: icon top left, detail top right, name bold bottom left, "ago" under it.
+    if (c->icon) draw_icon(ctx, c->icon, r.x + 8, r.y + 6, fg);
+    draw_text(ctx, c->l2, FONT_KEY_GOTHIC_14_BOLD, GRect(r.x + 34, r.y + 4, r.w - 40, 18), GTextAlignmentRight, fg);
+    draw_text(ctx, c->title, FONT_KEY_GOTHIC_24_BOLD, GRect(r.x + 8, r.y + r.h - 54, r.w - 12, 30), GTextAlignmentLeft, fg);
+    draw_text(ctx, c->l1, FONT_KEY_GOTHIC_18, GRect(r.x + 8, r.y + r.h - 28, r.w - 12, 24), GTextAlignmentLeft, fg);
   } else if (c->kind == CELL_BUTTON) {
     bool has_sub = c->l1[0] != '\0';
     bool small = r.h < 40 || (r.w < 100 && strlen(c->title) > 7);
@@ -116,12 +154,12 @@ static void draw_cell(GContext *ctx, const GridView *gv, int i) {
   if (c->selected && c->kind != CELL_HEADER && !chosen_chip) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, 3);
-    graphics_draw_round_rect(ctx, grect(r), CORNER);
+    graphics_draw_round_rect(ctx, grect(r), corner_of(c));
   }
   if (!gv->has_nav && gv->show_focus && gv->focus == i) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, 3);
-    graphics_draw_round_rect(ctx, GRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2), CORNER);
+    graphics_draw_round_rect(ctx, GRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2), corner_of(c));
   }
 }
 
@@ -171,9 +209,9 @@ static void draw_overlay(GContext *ctx, const GridView *gv) {
     graphics_draw_line(ctx, GPoint(82, 96), GPoint(97, 111));
     graphics_draw_line(ctx, GPoint(97, 111), GPoint(122, 80));
     draw_text(ctx, gv->message, FONT_KEY_GOTHIC_24_BOLD, GRect(14, 128, 172, 36), GTextAlignmentCenter, GColorWhite);
-  } else if (gv->overlay == 2) {
+  } else if (gv->overlay == 2 || gv->overlay == 3) {
     GRect box = GRect(10, 80, 180, 68);
-    graphics_context_set_fill_color(ctx, GColorRed);
+    graphics_context_set_fill_color(ctx, gv->overlay == 2 ? GColorRed : GColorDarkGray);
     graphics_fill_rect(ctx, box, 10, GCornersAll);
     draw_text(ctx, gv->message, FONT_KEY_GOTHIC_24_BOLD, GRect(16, 88, 168, 56), GTextAlignmentCenter, GColorWhite);
   }
@@ -438,6 +476,7 @@ static void apply_nav(GridView *gv, NavEffect e) {
 
 static void up_click(ClickRecognizerRef r, void *ctx) {
   GridView *gv = ctx;
+  if (gv->overlay) return;
   if (gv->has_nav) {
     if (!reveal_focus(gv)) apply_nav(gv, nav_up(&gv->nav));
     return;
@@ -447,6 +486,7 @@ static void up_click(ClickRecognizerRef r, void *ctx) {
 
 static void down_click(ClickRecognizerRef r, void *ctx) {
   GridView *gv = ctx;
+  if (gv->overlay) return;
   if (gv->has_nav) {
     if (!reveal_focus(gv)) apply_nav(gv, nav_down(&gv->nav));
     return;
@@ -464,6 +504,7 @@ static void back_click(ClickRecognizerRef r, void *ctx) {
 
 static void select_click(ClickRecognizerRef r, void *ctx) {
   GridView *gv = ctx;
+  if (gv->overlay) return;
   if (gv->has_nav) {
     if (!reveal_focus(gv)) apply_nav(gv, nav_select(&gv->nav));
     return;
@@ -479,6 +520,7 @@ static void select_click(ClickRecognizerRef r, void *ctx) {
 
 static void select_long_click(ClickRecognizerRef r, void *ctx) {
   GridView *gv = ctx;
+  if (gv->overlay) return;
   if (gv->has_nav) return;
   if (gv->show_focus && gv->focus >= 0 && gv->focus < gv->count && focusable(&gv->cells[gv->focus]) && gv->h.on_activate) {
     vibes_short_pulse();

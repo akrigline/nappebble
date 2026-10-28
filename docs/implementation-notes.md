@@ -1,6 +1,6 @@
 # Implementation notes: first full pass
 
-Status of `docs/pebble-nappi-spec-v2.md` against the code. Milestones M0 to M4 are built; M5 is not started.
+Status of `docs/nappebble-spec-v2.md` against the code. Milestones M0 to M4 are built; M5 is not started.
 
 ## What exists
 
@@ -26,19 +26,25 @@ Status of `docs/pebble-nappi-spec-v2.md` against the code. Milestones M0 to M4 a
 - **No "backdate start" on a running timer.** The API cannot edit a running timer's start, so backdating is only offered on the start sheet, through the time strip (reached by a tap, or by a long press on Sleep and Pump).
 - **Writes carry the tap time when delivered late.** A job queued more than 30 s ago is stamped with its queue time (`time` / `start_time` / `end_time`). Prompt sends carry no time, so a phone clock running ahead of the server cannot cause a "start in the future" rejection. Found by running the offline scenario in the emulator.
 - **Paused timers** (the API reports `paused`; the spec ignored it): shown as "Paused", clock frozen.
-- **Status / error screens are a header status plus the Status sheet**, not a full-screen takeover per error. Writes the API rejects for good (400/404) are dropped and logged, and the caches are reloaded; the watch does not yet tell the user.
+- **Status / error screens are a header status plus the Status sheet**, not a full-screen takeover per error. Writes the API rejects for good (400/404) are dropped and the caches are reloaded; the phone sends the watch an unprompted ACK (id 0, `REJECTED`) and the watch vibrates and shows "nappi rejected a log". There is still no persistent last-error line on the Status sheet.
 - **Page 2 is not special.** Status is the last tile in the user's layout (always appended), so it lands on page 2 only with the default order.
 - **Activity is removed.** The tile, sheet, command, message keys, Clay layout entry and tests are gone from the watch and the phone. A saved layout that still lists it is tolerated. The API client and mock still support activities.
 - **Presets and the Custom screen are replaced by the amount strip.** The Clay bottle presets setting is gone; the starting amount is the last amount logged on that screen.
 - **Long press is kept only on Sleep and Pump.** A tap starts the timer at once; a long press opens the start sheet to backdate. On every other tile a long press is a tap. This replaces the spec's long-press backdate set (-5..-60 min chips) with the time strip.
 - **Units are per screen and can be changed from the watch.** The single Clay "Units" setting became "Bottle units" and "Pump units" (an old `units` value seeds both). The oz / ml chips send `SET_UNITS` (screen 0 bottle, 1 pump; units 0 oz, 1 ml); the phone ACKs, saves and pushes state. If the send cannot be queued the unit stays unchanged and "Phone not connected" shows. A write keeps the unit it was logged in, even if the unit changes before the queue flushes: the watch sends the unit with `LOG_BOTTLE` and the pump `TIMER_STOP` (ARG4), and the phone falls back to its saved setting only if it is absent or invalid.
-- Acknowledgement is optimistic: the ACK means "queued", and the checkmark shows immediately. Delivery happens afterwards.
+- **The checkmark waits for the phone's ACK.** `ui_send` shows "Sending..." and only vibrates and shows the checkmark when the phone ACKs the command id. The ACK still means "queued on the phone"; delivery to nappi happens afterwards. A NACK status, a send that never got through, or 6 s of silence shows an error instead. If the send never reached the phone the action's lockout is cleared so the user can tap again at once.
+- **The outbox retries, but not blindly.** `comm.c` keeps a small FIFO (4) and retries a busy outbox, a disconnected phone and a NACK (PebbleKit JS not up yet) up to 4 times 600 ms apart. A send that timed out is not retried: it may have arrived and a second copy could log twice.
+- **Exit after log waits for delivery.** PebbleKit JS stops with the app, so the app holds on ("Saving...", up to 6 s) until the phone reports nothing pending. Writes stay queued on the phone if that never happens and go out next launch.
+- **Writes name the baby.** Every command carries `BABY_INDEX`; the phone ACKs `WRONG_BABY` and resends state if it is no longer the active baby. Omitted when the watch has no data yet.
+- **Queued writes are laid back over every read.** The cache still takes the optimistic guesses in place, but `readEverything` replays `queue.all()` on top of the server data so a refresh cannot make a pending log vanish.
+- **Read and write limits are separate.** A write 429 sets `writeBlockedUntil` only and schedules its own retry; reads carry on. `status` after a read is the last write status, so a good read does not hide a stuck write. The once-a-minute throttle and a read block no longer skip flushing the queue.
+- **Read budget.** The engine counts its own reads in a sliding minute; the debounced re-read after a write skips the other babies' timers and is skipped altogether with fewer than 4 reads left. A forced refresh asked for while one is running runs again afterwards. The Status sheet's Refresh sends `ARG1 1` to bypass the one-a-minute throttle.
 
 ## Verified, and not
 
 Automated (all run by `npm test`):
-- 315 JS tests against a mock of the whole API: contract tests for the mock itself, client, queue, engine, state builder, settings, Clay config, protocol sync, and the real `index.js` entry point under fake Pebble globals.
-- 354 C checks on the watch logic, compiled with `-Wall -Wextra -Werror -pedantic`.
+- 333 JS tests against a mock of the whole API: contract tests for the mock itself, client, queue, engine, state builder, settings, Clay config, protocol sync, and the real `index.js` entry point under fake Pebble globals.
+- C checks on the watch logic, compiled with `-Wall -Wextra -Werror -pedantic`.
 - `protocol-sync.test.js` fails if `protocol.h`, `protocol.js` or `package.json` message keys disagree.
 
 Exercised by hand in the Emery emulator with the mock server: launch from cache, status states, every sheet, diaper / bottle logging, sleep / nursing / pump timers, switch side, baby switching, paging by buttons, backdating with the time strip driven by buttons, and offline queue then recovery. Touch dragging on the strips was not run.
@@ -55,8 +61,17 @@ Exercised by hand in the Emery emulator with the mock server: launch from cache,
 - **A queued `SET_UNITS` that is later NACKed or times out is not handled on an open sheet.** The sheet and the phone's saved setting could then disagree until the sheet is reopened; amounts are still logged in the unit the sheet showed, because the unit travels with the command. (A send that cannot be queued is handled: the unit stays unchanged and "Phone not connected" shows.)
 - **An open sheet does not follow unit changes made in the phone settings** until it is reopened; amounts it logs are still in the unit it showed, because the unit travels with the command.
 
-**Known issue, not fixed here**
-- After the pump stop flow returns to Home, Up / Down / Select stop responding and Back exits the app. It was seen before this work and reproduced at the commit prior to the sheets rewrite, so it is not caused by the strips. Likely cause: the timer view popping itself while `ui_pop_to_home` runs. Not investigated further.
+**Fixed from the council review, not yet checked on a device**
+- After the pump stop flow returned to Home, Up / Down / Select stopped responding and Back exited the app. Likely cause (found by reading, never reproduced): the timer view popped itself from its own appear / state handler while `ui_pop_to_home` was still popping. It now defers its close with a 0 ms timer, closes with `window_stack_remove`, and does nothing while a confirmation is up. Needs a run on the emulator or a watch to confirm the symptom is gone.
+- The ACK / retry / exit-after-log paths in `comm.c` and `ui.c` compile but are not host-tested (they sit on the Pebble SDK). Try: log with the phone app closed, log straight after launch, stop the phone's Bluetooth, and exit-after-log with the phone offline.
+
+**Raised by the council and left alone**
+- Swipe on the nursing timer screen still switches side (stop then start, so one feed becomes two entries and there is no delete). The spec asks for the swipe; a confirmation would be a product decision.
+- A stop retried after a lost response could stop a timer another device has just started.
+- The queue is not tied to the token: changing the token clears the cache but not queued writes. A 401/403 still halts the whole queue.
+- `baseUrl` accepts `http://`.
+- Home redraws every second while a timer runs; the spec wants that only on the timer screen.
+- No persistent last-error line on the Status sheet; no check of `touch_service_is_enabled()`; the baby switcher caps at 4.
 
 ## Things learned the hard way
 

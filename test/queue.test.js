@@ -39,7 +39,7 @@ test('enqueue assigns an idempotency key and persists the job', () => {
   const job = h.queue.enqueue(diaper());
   assert.equal(job.key, 'key-1');
   assert.equal(h.queue.length(), 1);
-  assert.equal(JSON.parse(h.storage.data['nappi.queue']).length, 1);
+  assert.equal(JSON.parse(h.storage.data['nappebble.queue']).length, 1);
 });
 
 test('a new queue over the same storage sees the pending jobs (survives restart)', () => {
@@ -51,7 +51,7 @@ test('a new queue over the same storage sees the pending jobs (survives restart)
 
 test('corrupt stored queue is treated as empty', () => {
   const storage = memoryStorage();
-  storage.setItem('nappi.queue', '{nope');
+  storage.setItem('nappebble.queue', '{nope');
   assert.equal(createQueue({ storage, uuid: () => 'x' }).length(), 0);
 });
 
@@ -285,7 +285,7 @@ test('the stale threshold is 30 seconds', async () => {
 
 test('jobs persisted before this field existed still flush (no queuedAt)', async () => {
   const h = setup();
-  h.storage.setItem('nappi.queue', JSON.stringify([{ kind: 'entry', babyId: BABY.id, body: { type: 'diaper', diaper_type: 'wet' }, key: 'old-1' }]));
+  h.storage.setItem('nappebble.queue', JSON.stringify([{ kind: 'entry', babyId: BABY.id, body: { type: 'diaper', diaper_type: 'wet' }, key: 'old-1' }]));
   const q = createQueue({ storage: h.storage, uuid: () => 'x', now: () => h.clock.t, offsetAt: () => 0 });
   const res = await q.flush(h.client);
   assert.equal(res.sent, 1);

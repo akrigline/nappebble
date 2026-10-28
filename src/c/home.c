@@ -16,7 +16,7 @@ static void rebuild(GridView *gv) {
   int timer = model_banner(s, now, banner, sizeof(banner));
   char name[BABY_NAME_LEN + 4];
   if (s->baby_name[0]) snprintf(name, sizeof(name), s->other_timers ? "%s *" : "%s", s->baby_name);
-  else snprintf(name, sizeof(name), "nappi");
+  else snprintf(name, sizeof(name), "nappebble");
 
   char status[24], pending[24];
   model_tile_lines(s, ACTION_STATUS, now, status, sizeof(status), pending, sizeof(pending));
@@ -36,6 +36,7 @@ static void rebuild(GridView *gv) {
     model_tile_lines(s, action, now, l1, sizeof(l1), l2, sizeof(l2));
     GridCell *c = grid_view_add(gv, CELL_TILE, layout_tile_rect(slot), model_action_title(action), l1, l2,
                                 ui_action_color(action));
+    c->icon = ui_action_icon(action);
     int t = model_timer_for_action(action);
     c->selected = t >= 0 && model_timer_active(s, t);
   }

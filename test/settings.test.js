@@ -45,14 +45,14 @@ test('update merges rather than replaces', () => {
 });
 
 test('a stored legacy units value fills both per-screen units', () => {
-  const storage = memoryStorage({ 'nappi.settings': JSON.stringify({ units: 'ml' }) });
+  const storage = memoryStorage({ 'nappebble.settings': JSON.stringify({ units: 'ml' }) });
   const s = createSettings(storage).get();
   assert.equal(s.bottleUnits, 'ml');
   assert.equal(s.pumpUnits, 'ml');
 });
 
 test('a stored per-screen value wins over the legacy units value', () => {
-  const storage = memoryStorage({ 'nappi.settings': JSON.stringify({ units: 'ml', bottleUnits: 'oz' }) });
+  const storage = memoryStorage({ 'nappebble.settings': JSON.stringify({ units: 'ml', bottleUnits: 'oz' }) });
   const s = createSettings(storage).get();
   assert.equal(s.bottleUnits, 'oz');
   assert.equal(s.pumpUnits, 'ml');
@@ -67,7 +67,7 @@ test('empty storage gives oz for both, and no units or bottlePresets key exists'
 });
 
 test('corrupt stored JSON falls back to defaults instead of throwing', () => {
-  const storage = memoryStorage({ 'nappi.settings': '{not json' });
+  const storage = memoryStorage({ 'nappebble.settings': '{not json' });
   assert.deepEqual(createSettings(storage).get(), DEFAULTS);
 });
 
@@ -78,7 +78,7 @@ test('get returns a copy so callers cannot mutate the store', () => {
 });
 
 test('unknown stored keys are dropped', () => {
-  const storage = memoryStorage({ 'nappi.settings': JSON.stringify({ token: 't', junk: 1 }) });
+  const storage = memoryStorage({ 'nappebble.settings': JSON.stringify({ token: 't', junk: 1 }) });
   const s = createSettings(storage).get();
   assert.equal(s.token, 't');
   assert.equal('junk' in s, false);

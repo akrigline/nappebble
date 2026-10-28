@@ -15,13 +15,29 @@
 
 typedef struct {
   int timer;
+  AppTimer *close_timer;   // a deferred close of this window, see refresh()
+  int since_refresh;       // seconds since the phone was last asked for fresh state
 } TimerCtx;
 
 static const char *const TITLES[TIMER_COUNT] = { "Sleep", "Nursing", "Pump" };
 static const int ACTIONS[TIMER_COUNT] = { ACTION_SLEEP, ACTION_NURSING, ACTION_PUMP };
 
 static void free_ctx(GridView *gv) {
-  free(gv->ctx);
+  TimerCtx *c = gv->ctx;
+  if (c->close_timer) app_timer_cancel(c->close_timer);
+  free(c);
+}
+
+// Closes this screen once its timer is over. Never done from inside refresh():
+// that runs from the window's own appear handler, including while
+// ui_pop_to_home() is still popping windows, and a pop nested in a pop leaves
+// the window stack (and the button handlers) in a bad state.
+static void close_now(void *data) {
+  GridView *gv = data;
+  TimerCtx *c = gv->ctx;
+  c->close_timer = NULL;
+  if (model_timer_active(comm_state(), c->timer) || gv->overlay || grid_view_top() != gv) return;
+  window_stack_remove(gv->window, true);
 }
 
 static void refresh(GridView *gv) {
@@ -30,8 +46,9 @@ static void refresh(GridView *gv) {
   int32_t now = ui_now();
 
   if (!model_timer_active(s, c->timer)) {
-    // Stopped (here or on another device): nothing left to show.
-    if (grid_view_top() == gv) window_stack_pop(true);
+    // Stopped (here or on another device): nothing left to show. While a
+    // confirmation is up, leave it be: it ends by going Home (or exiting) itself.
+    if (!c->close_timer && !gv->overlay && grid_view_top() == gv) c->close_timer = app_timer_register(0, close_now, gv);
     return;
   }
   char clock[16], l1[24], l2[24];
@@ -43,6 +60,17 @@ static void refresh(GridView *gv) {
   bool running = s->timer_state[c->timer] == TIMER_STATE_RUNNING;
   if (gv->tick_secs != (running ? 1 : 0)) grid_view_set_tick(gv, running ? 1 : 0);
   grid_view_commit(gv);
+}
+
+// Once a second while running. A timer someone else stopped or paused would
+// otherwise stay on screen, since only Home asks the phone for fresh state.
+static void on_tick(GridView *gv) {
+  TimerCtx *c = gv->ctx;
+  if (++c->since_refresh >= 60) {
+    c->since_refresh = 0;
+    comm_send(CMD_REFRESH, 0, 0, 0, 0);   // the phone throttles to once a minute
+  }
+  refresh(gv);
 }
 
 static void switch_side(GridView *gv) {
@@ -79,7 +107,7 @@ void timer_view_open(int timer) {
   if (!c) return;
   c->timer = timer;
 
-  GridHandlers h = { .on_activate = on_activate, .on_swipe = on_swipe, .on_tick = refresh, .on_state = refresh, .on_unload = free_ctx };
+  GridHandlers h = { .on_activate = on_activate, .on_swipe = on_swipe, .on_tick = on_tick, .on_state = refresh, .on_unload = free_ctx };
   GridView *gv = grid_view_create(&h, c);
   if (!gv) {
     free(c);

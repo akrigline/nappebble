@@ -398,7 +398,7 @@ static void status_refresh(GridView *gv) {
 }
 
 static void status_activate(GridView *gv, int index, bool long_press) {
-  if (index == STATUS_REFRESH) comm_send(CMD_REFRESH, 0, 0, 0, 0);
+  if (index == STATUS_REFRESH) comm_send(CMD_REFRESH, 1, 0, 0, 0);   // ARG1 1: skip the phone's once-a-minute throttle
 }
 
 void sheet_status(void) {

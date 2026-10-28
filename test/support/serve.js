@@ -15,9 +15,9 @@ mock.addToken('dev-token');
 mock.addToken('expired-token', { expired: true });
 mock.addToken('revoked-token', { revoked: true });
 mock.addToken('free-token', { premium: false });
-mock.addBaby({ id: '6f1c1d52-3b8e-4c43-9a55-0d5d8f6a1a01', name: 'Phoebe', birth_date: '2026-03-02', timezone: 'America/New_York' });
+mock.addBaby({ id: '6f1c1d52-3b8e-4c43-9a55-0d5d8f6a1a01', name: 'Alex', birth_date: '2026-03-02', timezone: 'America/New_York' });
 if (process.env.TWO_BABIES) {
-  mock.addBaby({ id: '0a2b3c4d-1111-4222-8333-444455556666', name: 'Oscar', birth_date: '2024-01-09', timezone: 'America/New_York' });
+  mock.addBaby({ id: '0a2b3c4d-1111-4222-8333-444455556666', name: 'Sam', birth_date: '2024-01-09', timezone: 'America/New_York' });
 }
 
 // SEED=1 plants a little history for the first baby, relative to now, so the

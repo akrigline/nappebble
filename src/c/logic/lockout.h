@@ -16,3 +16,7 @@ void lockout_init(Lockout *l);
 
 // True (and records the time) if the action may fire now.
 bool lockout_try(Lockout *l, int action, uint32_t now_ms);
+
+// Forget the last attempt, for an action that never reached the phone: the
+// user may try again at once.
+void lockout_clear(Lockout *l, int action);

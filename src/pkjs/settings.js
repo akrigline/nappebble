@@ -1,7 +1,7 @@
 // Persistent phone-side settings, kept as one JSON blob in localStorage.
 // The token lives here and never goes to the watch.
 
-const KEY = 'nappi.settings';
+const KEY = 'nappebble.settings';
 
 const DEFAULTS = Object.freeze({
   token: '',
@@ -11,7 +11,7 @@ const DEFAULTS = Object.freeze({
   pumpUnits: 'oz',
   baseUrl: 'https://api.nappi.app',
   // Visible tiles in grid order (Status is always appended last by the state builder).
-  layout: Object.freeze(['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']),
+  layout: Object.freeze(['sleep', 'nursing', 'bottle', 'diaper', 'pump', 'potty']),
   defaultBottleType: 'formula',
   exitAfterLog: false
 });

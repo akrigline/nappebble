@@ -9,7 +9,7 @@
 #define PERSIST_VERSION 1
 
 #define INBOX_SIZE 1024
-#define OUTBOX_SIZE 96
+#define OUTBOX_SIZE 128
 
 static WatchState s_state;
 static CommStateHandler s_state_handler;
@@ -136,24 +136,109 @@ static void inbox_dropped(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_WARNING, "inbox dropped: %d", (int)reason);
 }
 
-static void outbox_failed(DictionaryIterator *it, AppMessageResult reason, void *context) {
-  APP_LOG(APP_LOG_LEVEL_WARNING, "outbox failed: %d", (int)reason);
+// ---- outbox ----
+//
+// One message is in flight at a time; the rest wait their turn. A message the
+// phone never processed (outbox busy, phone not connected, PebbleKit JS not up
+// yet and so NACKing) is retried a few times. One that timed out is not: it
+// may have arrived, and sending it again could log twice.
+
+#define OUT_QUEUE 4
+#define OUT_RETRY_MS 600
+#define OUT_MAX_TRIES 4
+
+typedef struct {
+  int32_t cmd, id, args[4];
+  bool has_baby;
+  int32_t baby_index;
+} OutCmd;
+
+static OutCmd s_out[OUT_QUEUE];
+static int s_out_count;        // s_out[0] is the one being sent
+static int s_out_tries;
+static bool s_out_sending;     // handed to AppMessage, no sent/failed callback yet
+static AppTimer *s_out_timer;
+
+static void out_try(void *unused);
+
+static void out_pop(void) {
+  s_out_count--;
+  memmove(&s_out[0], &s_out[1], sizeof(OutCmd) * (size_t)s_out_count);
+  s_out_tries = 0;
 }
 
-// ---- outbox ----
+static void out_give_up(int status) {
+  int id = (int)s_out[0].id;
+  out_pop();
+  if (s_ack_handler) s_ack_handler(id, status);
+  if (s_out_count > 0) out_try(NULL);
+}
+
+static void out_retry(void) {
+  s_out_sending = false;
+  if (++s_out_tries < OUT_MAX_TRIES) {
+    s_out_timer = app_timer_register(OUT_RETRY_MS, out_try, NULL);
+    return;
+  }
+  out_give_up(COMM_ACK_NOT_SENT);
+}
+
+static void out_try(void *unused) {
+  s_out_timer = NULL;
+  if (s_out_count == 0 || s_out_sending) return;
+  DictionaryIterator *it;
+  AppMessageResult r = app_message_outbox_begin(&it);
+  if (r == APP_MSG_OK) {
+    const OutCmd *c = &s_out[0];
+    dict_write_int32(it, MESSAGE_KEY_CMD, c->cmd);
+    dict_write_int32(it, MESSAGE_KEY_CMD_ID, c->id);
+    dict_write_int32(it, MESSAGE_KEY_ARG1, c->args[0]);
+    dict_write_int32(it, MESSAGE_KEY_ARG2, c->args[1]);
+    dict_write_int32(it, MESSAGE_KEY_ARG3, c->args[2]);
+    dict_write_int32(it, MESSAGE_KEY_ARG4, c->args[3]);
+    if (c->has_baby) dict_write_int32(it, MESSAGE_KEY_BABY_INDEX, c->baby_index);
+    r = app_message_outbox_send();
+  }
+  if (r == APP_MSG_OK) {
+    s_out_sending = true;
+    return;
+  }
+  out_retry();
+}
+
+static void outbox_sent(DictionaryIterator *it, void *context) {
+  s_out_sending = false;
+  out_pop();
+  if (s_out_count > 0) out_try(NULL);
+}
+
+static void outbox_failed(DictionaryIterator *it, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_WARNING, "outbox failed: %d", (int)reason);
+  if (s_out_count == 0) return;
+  s_out_sending = false;
+  if (reason == APP_MSG_SEND_REJECTED || reason == APP_MSG_NOT_CONNECTED || reason == APP_MSG_BUSY) {
+    out_retry();
+  } else {
+    out_give_up(COMM_ACK_NO_REPLY);
+  }
+}
 
 bool comm_send(int cmd, int32_t a1, int32_t a2, int32_t a3, int32_t a4) {
   if (!connection_service_peek_pebble_app_connection()) return false;
-  DictionaryIterator *it;
-  if (app_message_outbox_begin(&it) != APP_MSG_OK) return false;
+  if (s_out_count >= OUT_QUEUE) return false;
   s_cmd_id++;
-  dict_write_int32(it, MESSAGE_KEY_CMD, cmd);
-  dict_write_int32(it, MESSAGE_KEY_CMD_ID, s_cmd_id);
-  dict_write_int32(it, MESSAGE_KEY_ARG1, a1);
-  dict_write_int32(it, MESSAGE_KEY_ARG2, a2);
-  dict_write_int32(it, MESSAGE_KEY_ARG3, a3);
-  dict_write_int32(it, MESSAGE_KEY_ARG4, a4);
-  return app_message_outbox_send() == APP_MSG_OK;
+  OutCmd *c = &s_out[s_out_count++];
+  c->cmd = cmd;
+  c->id = s_cmd_id;
+  c->args[0] = a1;
+  c->args[1] = a2;
+  c->args[2] = a3;
+  c->args[3] = a4;
+  // Name the baby the watch is showing, so the phone can refuse if it has moved on.
+  c->has_baby = s_state.has_data;
+  c->baby_index = s_state.baby_index;
+  if (s_out_count == 1) out_try(NULL);
+  return true;
 }
 
 // ---- lifecycle ----
@@ -163,6 +248,7 @@ void comm_init(void) {
   load_persisted();
   app_message_register_inbox_received(inbox_received);
   app_message_register_inbox_dropped(inbox_dropped);
+  app_message_register_outbox_sent(outbox_sent);
   app_message_register_outbox_failed(outbox_failed);
   app_message_open(INBOX_SIZE, OUTBOX_SIZE);
 }

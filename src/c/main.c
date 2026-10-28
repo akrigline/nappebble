@@ -6,6 +6,7 @@
 
 static void on_state(void) {
   grid_view_notify_state();
+  ui_on_state();
 }
 
 static void init(void) {

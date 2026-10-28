@@ -9,7 +9,7 @@
 
 const { toIsoOffset } = require('./time');
 
-const KEY = 'nappi.queue';
+const KEY = 'nappebble.queue';
 // A job delivered later than this is stamped with when it was queued. Prompt
 // sends carry no time so the server's own clock decides, which avoids "start
 // time in the future" rejections when the phone clock runs a little fast.
@@ -133,4 +133,4 @@ function createQueue(deps) {
   };
 }
 
-module.exports = { createQueue };
+module.exports = { createQueue, STAMP_FIELD };

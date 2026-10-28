@@ -12,6 +12,9 @@
 #define STATUS_RATE_LIMITED 6
 #define STATUS_NO_BABY 7
 #define STATUS_ERROR 8
+// ACK_STATUS only; see protocol.js.
+#define STATUS_REJECTED 9
+#define STATUS_WRONG_BABY 10
 
 #define ACTION_DIAPER 0
 #define ACTION_BOTTLE 1

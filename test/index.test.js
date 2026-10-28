@@ -34,7 +34,7 @@ function boot(opts) {
   const opened = [];
   const requests = [];
   const store = {};
-  if (o.token) store['nappi.settings'] = JSON.stringify({ token: o.token });
+  if (o.token) store['nappebble.settings'] = JSON.stringify({ token: o.token });
 
   const clayInstances = [];
   class FakeClay {
@@ -161,7 +161,7 @@ test('webviewclosed saves the settings and syncs again', async () => {
   await b.settle();
   b.fire('webviewclosed', { response: JSON.stringify({ token: { value: 'good-token' }, bottleUnits: { value: 'ml' } }) });
   await b.settle();
-  assert.equal(JSON.parse(b.store['nappi.settings']).bottleUnits, 'ml');
+  assert.equal(JSON.parse(b.store['nappebble.settings']).bottleUnits, 'ml');
   const last = b.sent.filter((d) => 'STATUS' in d).pop();
   assert.equal(last.STATUS, P.STATUS.OK);
   assert.equal(last.BOTTLE_UNITS, P.UNITS.ML);

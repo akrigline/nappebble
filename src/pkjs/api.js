@@ -21,6 +21,15 @@ function header(headers, name) {
   return undefined;
 }
 
+// Retry-After is delay-seconds or an HTTP-date (RFC 9110). undefined when absent or unreadable.
+function parseRetryAfter(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return seconds;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? undefined : Math.max(0, Math.ceil((at - Date.now()) / 1000));
+}
+
 function parseJson(text) {
   try {
     return { ok: true, value: JSON.parse(text) };
@@ -64,8 +73,7 @@ function createClient(options) {
       if (!parsed.ok) throw new ApiError('bad_response', 'Response was not valid JSON', res.status);
       return { status: res.status, headers: res.headers, value: parsed.value };
     }
-    const seconds = Number(header(res.headers, 'retry-after'));
-    const retryAfter = Number.isFinite(seconds) ? seconds : undefined;
+    const retryAfter = parseRetryAfter(header(res.headers, 'retry-after'));
     const detail = parsed.ok && parsed.value && parsed.value.error;
     if (!detail || typeof detail.code !== 'string') {
       throw new ApiError('bad_response', 'HTTP ' + res.status, res.status, retryAfter);

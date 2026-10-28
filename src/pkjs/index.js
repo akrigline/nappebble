@@ -12,7 +12,7 @@ const { toWire } = require('./wire');
 const { uuidv4 } = require('./uuid');
 
 function log(err) {
-  console.log('nappi: ' + (err && err.message ? err.message : err));
+  console.log('nappebble: ' + (err && err.message ? err.message : err));
 }
 
 const settings = createSettings(localStorage);

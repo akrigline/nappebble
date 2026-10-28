@@ -1,5 +1,5 @@
 {
-  "name": "pebble-nappi",
+  "name": "nappebble",
   "author": "MakeAwesomeHappen",
   "version": "1.0.0",
   "keywords": [
@@ -16,7 +16,7 @@
     "pebble-clay": "^1.0.4"
   },
   "pebble": {
-    "displayName": "nappi",
+    "displayName": "nappebble",
     "uuid": "9d7f77ad-7857-480d-b1fa-73eff0df3926",
     "sdkVersion": "3",
     "enableMultiJS": true,
@@ -60,7 +60,14 @@
       "PENDING"
     ],
     "resources": {
-      "media": []
+      "media": [
+        { "type": "bitmap", "name": "MENU_ICON", "file": "icons/menu-icon.png", "menuIcon": true },
+        { "type": "bitmap", "name": "ICON_SLEEP", "file": "icons/sleep.png", "memoryFormat": "1BitPalette" },
+        { "type": "bitmap", "name": "ICON_NURSING", "file": "icons/nursing.png", "memoryFormat": "1BitPalette" },
+        { "type": "bitmap", "name": "ICON_BOTTLE", "file": "icons/bottle.png", "memoryFormat": "1BitPalette" },
+        { "type": "bitmap", "name": "ICON_DIAPER", "file": "icons/diaper.png", "memoryFormat": "1BitPalette" },
+        { "type": "bitmap", "name": "ICON_PUMP", "file": "icons/pump.png", "memoryFormat": "1BitPalette" }
+      ]
     }
   }
 }

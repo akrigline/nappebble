@@ -66,9 +66,9 @@ TEST(actions_map_to_their_timers) {
 }
 
 TEST(titles_and_labels) {
-  CHECK_STR(model_action_title(ACTION_DIAPER), "DIAPER");
-  CHECK_STR(model_action_title(ACTION_NURSING), "NURSING");
-  CHECK_STR(model_action_title(ACTION_STATUS), "STATUS");
+  CHECK_STR(model_action_title(ACTION_DIAPER), "Diaper");
+  CHECK_STR(model_action_title(ACTION_NURSING), "Nursing");
+  CHECK_STR(model_action_title(ACTION_STATUS), "Status");
   CHECK_STR(model_diaper_label(DIAPER_POO), "Poo");
   CHECK_STR(model_potty_label(POTTY_SAT_DRY), "Sat dry");
   CHECK_STR(model_side_label(SIDE_LEFT), "Left");

@@ -15,7 +15,7 @@ const byKey = (config, key) => {
 };
 
 test('new settings default to spec layout, formula, stay-open', () => {
-  assert.deepEqual(DEFAULTS.layout, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']);
+  assert.deepEqual(DEFAULTS.layout, ['sleep', 'nursing', 'bottle', 'diaper', 'pump', 'potty']);
   assert.equal(DEFAULTS.defaultBottleType, 'formula');
   assert.equal(DEFAULTS.exitAfterLog, false);
 });
@@ -35,7 +35,7 @@ test('layout persists', () => {
 
 test('the config page has a position picker per action, prefilled from the saved layout', () => {
   const config = buildConfig({ settings: Object.assign({}, DEFAULTS, { layout: ['sleep', 'diaper'] }), babies: [] });
-  assert.deepEqual(ACTION_ORDER, ['diaper', 'bottle', 'nursing', 'sleep', 'pump', 'potty']);
+  assert.deepEqual(ACTION_ORDER, ['sleep', 'nursing', 'bottle', 'diaper', 'pump', 'potty']);
   ACTION_ORDER.forEach((a) => assert.equal(byKey(config, 'pos_' + a).type, 'select', a));
   assert.equal(byKey(config, 'pos_sleep').defaultValue, '1');
   assert.equal(byKey(config, 'pos_diaper').defaultValue, '2');
@@ -74,7 +74,7 @@ test('activity is gone from the config page and from responses', () => {
 
 test('equal positions fall back to the default order', () => {
   const patch = settingsFromClayResponse({ pos_diaper: { value: '1' }, pos_bottle: { value: '1' } });
-  assert.deepEqual(patch.layout, ['diaper', 'bottle']);
+  assert.deepEqual(patch.layout, ['bottle', 'diaper']);
 });
 
 test('hiding every action is ignored so the grid is never empty', () => {
