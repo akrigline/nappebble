@@ -4,9 +4,10 @@
 
 const { DEFAULTS } = require('./settings');
 const { resolveActiveBaby } = require('./babies');
+const { NAPPI_DOCS_URL } = require('./protocol');
 
 const NO_BABIES_HINT = 'Enter your API token and save, then reopen these settings to choose a baby. ' +
-  'Create a token at nappi.app/app/connections.';
+  'See the <a href="' + NAPPI_DOCS_URL + '">nappi API documentation</a> for how to get one.';
 
 // Default grid order (nappi's own: Sleep, Nursing, Bottle, Diaper, then ours); also the tie-break when two tiles share a position.
 const ACTION_ORDER = ['sleep', 'nursing', 'bottle', 'diaper', 'pump', 'potty'];
@@ -37,7 +38,7 @@ function buildConfig(options) {
       type: 'input',
       messageKey: 'token',
       label: 'API token',
-      description: 'From nappi.app/app/connections. Use a dedicated token for this watch.',
+      description: 'See the <a href="' + NAPPI_DOCS_URL + '">nappi API documentation</a> for how to create a token. Use a dedicated token for this watch.',
       defaultValue: settings.token,
       attributes: { type: 'password', autocomplete: 'off' }
     }

@@ -1,10 +1,12 @@
 {
   "name": "nappebble",
   "author": "MakeAwesomeHappen",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "Pebble Time 2 watchapp for logging feeds, diapers and sleep to the nappi baby tracker",
   "keywords": [
     "pebble-app"
   ],
+  "license": "MIT",
   "private": true,
   "scripts": {
     "test": "npm run test:js && npm run test:c",

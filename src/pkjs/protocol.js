@@ -92,12 +92,15 @@ const MESSAGE_KEYS = [
   'PENDING',
 ];
 
+// nappi's own API documentation, which says how to create a token. We link to it rather than restating it.
+const NAPPI_DOCS_URL = 'https://nappi.app/app/api/reference';
+
 function statusMessage(status, retryAfter) {
   switch (status) {
     case STATUS.OK: return 'Connected to nappi.';
     case STATUS.NO_TOKEN: return 'No API token yet.';
-    case STATUS.UNAUTHORIZED: return 'That token was not accepted. Create a new one at nappi.app/app/connections.';
-    case STATUS.TOKEN_EXPIRED: return 'That token has expired. Create a new one at nappi.app/app/connections.';
+    case STATUS.UNAUTHORIZED: return 'That token was not accepted. See ' + NAPPI_DOCS_URL + ' to create a new one.';
+    case STATUS.TOKEN_EXPIRED: return 'That token has expired. See ' + NAPPI_DOCS_URL + ' to create a new one.';
     case STATUS.PREMIUM_REQUIRED: return 'The nappi API needs nappi Premium on the token owner\'s account.';
     case STATUS.NETWORK: return 'Could not reach nappi. Check the phone\'s connection.';
     case STATUS.RATE_LIMITED: return 'nappi is rate limiting this token. Try again in ' + retryAfter + ' seconds.';
@@ -123,7 +126,7 @@ function describeError(err) {
 }
 
 module.exports = {
-  STATUS, statusMessage, describeError,
+  STATUS, NAPPI_DOCS_URL, statusMessage, describeError,
   ACTION, CMD, DIAPER, DIAPER_TYPES, BOTTLE_TYPE, BOTTLE_TYPES, POTTY, POTTY_OUTCOMES,
   TIMER, TIMER_TYPES, TIMER_STATE, SIDE, UNITS, UNITS_SCREEN, MESSAGE_KEYS,
 };

@@ -29,7 +29,7 @@ Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bot
 - `src/c/logic/` the watch's decisions as plain C (formatting, geometry, touch gestures, lockout, strips, tile text), unit-tested on the host with gcc.
 - `src/c/` the Pebble UI: one reusable `GridView` window drives Home and every sheet.
 - `src/pkjs/protocol.js` is the source of truth for enums and message keys; `src/c/logic/protocol.h` and `package.json` must match, and a test enforces it.
-- `art/icons/*.svg` are the nappi app's 24px tile icons; `node tools/make-icons.js` (after `npm i --no-save @resvg/resvg-js pngjs`) renders them to the 1-bit PNGs in `resources/icons/`. `grid_view.c` recolours them to each tile's text colour.
+- `art/icons/*.svg` are the nappi app's 24px tile icons; `node tools/make-icons.js` (after `npm i --no-save @resvg/resvg-js pngjs`) renders them to the 1-bit PNGs in `resources/icons/`. `grid_view.c` recolours them to each tile's text colour. The launcher menu icon (`menu-icon.png`) and the appstore icons in `store/` are made from `art/nappi-logo.png` by the same script and `tools/make-store-assets.js`.
 - `test/support/` mock nappi API (`mock-nappi.js`), engine harness, HTTP wrapper and dev server.
 
 ## Gotchas
@@ -39,3 +39,7 @@ Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bot
 - Clay builds its widgets from the config passed to its constructor, so `index.js` makes a new Clay per settings page.
 - The docs give no error code for 429 or 404; the client branches on HTTP status for 429.
 - The emulator's XHR reports a refused connection only through `readystatechange`; `xhr-transport.js` copes and has a watchdog.
+
+## License
+
+MIT, see `LICENSE`. The tile icons in `art/icons/` and the logo in `art/nappi-logo.png` (with the menu and store icons built from it) are nappi's artwork, not ours, and the MIT license does not cover them.

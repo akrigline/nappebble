@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { STATUS, statusMessage, describeError } = require('../src/pkjs/protocol');
+const { STATUS, NAPPI_DOCS_URL, statusMessage, describeError } = require('../src/pkjs/protocol');
 const { ApiError } = require('../src/pkjs/api');
 
 test('status codes are distinct small integers (AppMessage-friendly)', () => {
@@ -26,6 +26,12 @@ test('API error codes map to watch statuses', () => {
 test('a 429 maps by status, not by the undocumented error code', () => {
   const err = new ApiError('some_code_we_never_saw', 'slow down', 429, 12);
   assert.deepEqual(describeError(err), { status: STATUS.RATE_LIMITED, retryAfter: 12, text: statusMessage(STATUS.RATE_LIMITED, 12) });
+});
+
+test('token problems link to nappi\'s own docs instead of explaining how to make a token', () => {
+  for (const status of [STATUS.UNAUTHORIZED, STATUS.TOKEN_EXPIRED]) {
+    assert.ok(statusMessage(status).includes(NAPPI_DOCS_URL));
+  }
 });
 
 test('every status has a human sentence for the settings page', () => {
