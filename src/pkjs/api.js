@@ -1,4 +1,4 @@
-// nappi API client. See docs/nappi-api.md.
+// nappi API client. See https://nappi.app/app/api/reference.
 //
 // `transport(req) -> Promise<{ status, headers, body }>` does the actual HTTP
 // (XHR on the phone, the mock in tests). `body` is the raw response text.

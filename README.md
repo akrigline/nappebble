@@ -1,6 +1,6 @@
 # nappebble
 
-Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `docs/nappebble-spec-v2.md`. API notes: `../docs/nappi-api.md`. What is built, what differs from the spec, and what is unverified: `docs/implementation-notes.md`.
+Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `docs/nappebble-spec-v2.md`. nappi API docs: <https://nappi.app/app/api/reference>. What is built, what differs from the spec, and what is unverified: `docs/implementation-notes.md`.
 
 ## Commands
 

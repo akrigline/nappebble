@@ -1,5 +1,5 @@
-// In-memory stand-in for api.nappi.app, built from docs/nappi-api.md
-// (itself from https://api.nappi.app/v1/openapi.json).
+// In-memory stand-in for api.nappi.app, built from nappi's published OpenAPI spec
+// (https://api.nappi.app/v1/openapi.json).
 //
 // handle({ method, url, headers, body }) -> { status, headers, body }
 // `body` on the way out is a JSON string, as on the wire.

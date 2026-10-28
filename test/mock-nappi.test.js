@@ -1,6 +1,6 @@
 // Contract tests for the mock nappi API. The mock stands in for api.nappi.app
-// in every other test, so these pin it to what docs/nappi-api.md says the
-// real API does.
+// in every other test, so these pin it to what nappi's API docs (https://nappi.app/app/api/reference)
+// say the real API does.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMockNappi } = require('./support/mock-nappi');

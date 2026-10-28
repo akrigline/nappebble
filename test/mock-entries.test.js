@@ -1,4 +1,4 @@
-// Contract tests for the mock's entries endpoints, pinned to docs/nappi-api.md.
+// Contract tests for the mock's entries endpoints, pinned to nappi's API docs (https://nappi.app/app/api/reference).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMockNappi } = require('./support/mock-nappi');
