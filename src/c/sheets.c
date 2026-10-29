@@ -362,7 +362,11 @@ static void babies_activate(GridView *gv, int index, bool long_press) {
   const WatchState *s = comm_state();
   int baby = index - 1;
   if (baby < 0 || baby >= s->baby_count) return;
-  comm_send(CMD_SWITCH_BABY, baby, 0, 0, 0);
+  if (!comm_send(CMD_SWITCH_BABY, baby, 0, 0, 0)) {
+    vibes_double_pulse();
+    grid_view_flash(gv, 2, "Phone not connected", 1500, NULL);
+    return;
+  }
   window_stack_pop(true);
 }
 
@@ -398,7 +402,14 @@ static void status_refresh(GridView *gv) {
 }
 
 static void status_activate(GridView *gv, int index, bool long_press) {
-  if (index == STATUS_REFRESH) comm_send(CMD_REFRESH, 1, 0, 0, 0);   // ARG1 1: skip the phone's once-a-minute throttle
+  if (index != STATUS_REFRESH) return;
+  // ARG1 1: skip the phone's once-a-minute throttle
+  if (!comm_send(CMD_REFRESH, 1, 0, 0, 0)) {
+    vibes_double_pulse();
+    grid_view_flash(gv, 2, "Phone not connected", 1500, NULL);
+    return;
+  }
+  grid_view_flash(gv, 3, "Refreshing...", 800, NULL);
 }
 
 void sheet_status(void) {
