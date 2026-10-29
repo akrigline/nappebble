@@ -5,14 +5,9 @@
 #include "logic/model.h"
 
 typedef void (*CommStateHandler)(void);
-// status is a STATUS_* from the phone, or one of the COMM_ACK_* below when the
-// watch itself gives up. cmd_id 0 is the phone speaking unprompted.
+// status is a STATUS_* from the phone, or one of the COMM_ACK_* (logic/protocol.h)
+// when the watch itself gives up. cmd_id 0 is the phone speaking unprompted.
 typedef void (*CommAckHandler)(int cmd_id, int status);
-
-// Never reached the phone, so nothing was logged and trying again is safe.
-#define COMM_ACK_NOT_SENT (-1)
-// Sent, but no word back: it may or may not have arrived.
-#define COMM_ACK_NO_REPLY (-2)
 
 void comm_init(void);
 void comm_deinit(void);

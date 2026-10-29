@@ -71,5 +71,11 @@
 #define UNITS_SCREEN_BOTTLE 0
 #define UNITS_SCREEN_PUMP 1
 
+// Watch-only ack statuses, not on the wire (never sent by the phone).
+// Never reached the phone, so nothing was logged and trying again is safe.
+#define COMM_ACK_NOT_SENT (-1)
+// Sent, but no word back: it may or may not have arrived.
+#define COMM_ACK_NO_REPLY (-2)
+
 #define ACTION_COUNT 7
 #define TIMER_COUNT 3
