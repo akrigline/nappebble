@@ -17,6 +17,7 @@ The project is at v0.1.0 and is in daily use on a Pebble Time 2 with a real phon
 | App store fields, description, assets and the publish checklist | [docs/store-listing.md](docs/store-listing.md) |
 | Pebble SDK API details | <https://developer.repebble.com/llms.txt>. Fetch the `.md` version of any page before using an API; do not rely on memory. |
 | nappi API details | <https://nappi.app/app/api/reference> and <https://api.nappi.app/v1/openapi.json>. ARCHITECTURE.md section 3.1 lists the facts the design depends on. |
+| General Pebble app and watchface practice | The vendored `pebble-watchface` skill, `.claude/skills/pebble-watchface/` (see below) |
 
 `docs/superpowers/` is git-ignored scratch space for agent plans and specs. Nothing in it is authoritative; the two main docs are.
 
@@ -57,8 +58,19 @@ test/            *.test.js (node:test); c/ (host C tests + Makefile); support/ (
 resources/icons  1-bit tile icons and the menu icon;  art/ their SVG sources and nappi's logo
 store/           appstore icons and screenshots;  tools/ scripts that render icons and store assets
 docs/            ARCHITECTURE.md, PRODUCT.md, store-listing.md
+.claude/skills/   vendored third-party skill: pebble-watchface
 package.json     the app manifest too: uuid, targetPlatforms, messageKeys, resources
 ```
+
+## Vendored skill: pebble-watchface
+
+`.claude/skills/pebble-watchface/` is a third-party agent skill by coredevices, copied into this repo so it is available to anyone working here. Source and updates: <https://github.com/coredevices/pebble-watchface-agent-skill> (the copy targets SDK 4.33.1, the same as this project). It has SDK guides for watchapps, drawing and animation, a list of SDK doc URLs, project scaffolding and validation scripts, and templates.
+
+Use it for general Pebble questions, not as the authority on this app:
+
+- It is written mainly for watchfaces. It has no coverage of the touch API, and rules such as "always tick by minute" do not all apply to an app with a running-timer screen (ARCHITECTURE.md ADR-016).
+- Where it disagrees with `docs/ARCHITECTURE.md`, the architecture doc wins.
+- Do not edit it in place. To update it, re-copy it from upstream. Its scripts scaffold new projects; do not run them in this repo.
 
 ## Rules that bite
 
