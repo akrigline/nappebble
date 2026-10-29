@@ -11,6 +11,7 @@ static GridView *s_top;
 static GridView *s_touch_owner;
 static GridView *s_tick_owner;
 static int s_next_id;
+static bool s_touch_notice_shown;   // the "touch is off" notice appears once per launch
 
 static uint32_t now_ms(void) {
   time_t s;
@@ -571,13 +572,27 @@ static void window_appear(Window *window) {
   GridView *gv = window_get_user_data(window);
   s_top = gv;
 
-  s_touch_owner = gv;
-  // Emery is touch-only for now; a Gabbro port should check touch support here.
-  touch_service_subscribe(touch_handler, gv);
+  bool touch_on = touch_service_is_enabled();
+  if (touch_on) {
+    s_touch_owner = gv;
+    touch_service_subscribe(touch_handler, gv);
+  } else {
+    // No touch events will arrive: work from the buttons, with the ring showing.
+    gv->show_focus = true;
+    if (!gv->has_nav && (gv->focus < 0 || gv->focus >= gv->count || !focusable(&gv->cells[gv->focus]))) {
+      int first = next_focusable(gv, -1, 1);
+      if (first >= 0) gv->focus = first;
+    }
+  }
 
   s_tick_owner = gv;
   apply_tick(gv);
   if (gv->h.on_state) gv->h.on_state(gv);
+
+  if (!touch_on && !s_touch_notice_shown && !gv->overlay) {
+    s_touch_notice_shown = true;
+    grid_view_flash(gv, 3, "Touch is off. Using buttons.", 2500, NULL);
+  }
 }
 
 static void window_disappear(Window *window) {
@@ -632,6 +647,7 @@ GridView *grid_view_create(const GridHandlers *handlers, void *ctx) {
   touch_fsm_init(&gv->fsm);
 
   gv->window = window_create();
+  window_set_touch_bridge_disabled(gv->window, true);   // this view reads raw touch itself
   window_set_user_data(gv->window, gv);
   window_set_background_color(gv->window, GColorWhite);
   window_set_window_handlers(gv->window, (WindowHandlers) {
