@@ -22,10 +22,11 @@ void ui_on_state(void);
 // Standard sheet header: "<baby>: <title>" in the baby's accent colour.
 void ui_add_header(GridView *gv, const char *title);
 
-// Sends a write command: ignores a repeat within the lockout and tells the
-// user when the phone is unreachable. Otherwise it shows "Sending..." and only
-// vibrates and shows the checkmark, captioned "<baby>: <what>", once the phone
-// has acknowledged the command; a refusal, a failed send or silence shows an
-// error instead. Then it returns to Home, or exits (after the phone has
-// delivered the write to nappi).
+// Sends a write command: ignores a repeat within the lockout, refuses a second
+// one while the first awaits its ACK ("Still sending"), and tells the user when
+// the phone is unreachable. Otherwise it shows "Sending..." and only vibrates
+// and shows the checkmark, captioned "<baby>: <what>", once the phone has
+// acknowledged the command; a refusal or a failed send shows an error, and
+// silence shows "Not confirmed". If the sending view is still in front it then
+// returns to Home, or exits (after the phone has delivered the write to nappi).
 bool ui_send(int action, const char *what, int cmd, int32_t a1, int32_t a2, int32_t a3, int32_t a4);

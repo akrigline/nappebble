@@ -8,6 +8,8 @@ typedef void (*CommStateHandler)(void);
 // status is a STATUS_* from the phone, or one of the COMM_ACK_* (logic/protocol.h)
 // when the watch itself gives up. cmd_id 0 is the phone speaking unprompted.
 typedef void (*CommAckHandler)(int cmd_id, int status);
+// Called each time a command is handed to AppMessage (a retry calls it again).
+typedef void (*CommSentHandler)(int cmd_id);
 
 void comm_init(void);
 void comm_deinit(void);
@@ -16,6 +18,7 @@ const WatchState *comm_state(void);
 
 void comm_set_state_handler(CommStateHandler handler);
 void comm_set_ack_handler(CommAckHandler handler);
+void comm_set_sent_handler(CommSentHandler handler);
 
 // Queues a command for the phone and returns true once it is accepted. A busy
 // outbox or a phone that is not ready yet (PebbleKit JS still starting) is

@@ -52,6 +52,7 @@ typedef struct {
 } GridHandlers;
 
 struct GridView {
+  int id;                    // nonzero and never reused, unlike the pointer
   Window *window;
   Layer *layer;
   GridCell cells[GRID_MAX_CELLS];
@@ -98,4 +99,6 @@ void grid_view_set_zones(GridView *gv, const NavZone *zones, const int *first_ce
 void grid_view_flash(GridView *gv, int kind, const char *message, int ms, void (*done)(GridView *gv));
 
 GridView *grid_view_top(void);
+int grid_view_id(const GridView *gv);   // 0 for NULL
+int grid_view_top_id(void);             // 0 when no view is on top
 void grid_view_notify_state(void);

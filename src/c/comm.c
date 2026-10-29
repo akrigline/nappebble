@@ -14,6 +14,7 @@
 static WatchState s_state;
 static CommStateHandler s_state_handler;
 static CommAckHandler s_ack_handler;
+static CommSentHandler s_sent_handler;
 static int s_cmd_id;
 
 const WatchState *comm_state(void) {
@@ -26,6 +27,10 @@ void comm_set_state_handler(CommStateHandler handler) {
 
 void comm_set_ack_handler(CommAckHandler handler) {
   s_ack_handler = handler;
+}
+
+void comm_set_sent_handler(CommSentHandler handler) {
+  s_sent_handler = handler;
 }
 
 int comm_last_cmd_id(void) {
@@ -201,6 +206,7 @@ static void out_try(void *unused) {
   }
   if (r == APP_MSG_OK) {
     s_out_sending = true;
+    if (s_sent_handler) s_sent_handler((int)s_out[0].id);
     return;
   }
   out_retry();

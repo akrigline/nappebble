@@ -10,6 +10,7 @@ static GridView *s_live[MAX_LIVE_VIEWS];
 static GridView *s_top;
 static GridView *s_touch_owner;
 static GridView *s_tick_owner;
+static int s_next_id;
 
 static uint32_t now_ms(void) {
   time_t s;
@@ -620,6 +621,8 @@ static void window_unload(Window *window) {
 GridView *grid_view_create(const GridHandlers *handlers, void *ctx) {
   GridView *gv = calloc(1, sizeof(GridView));
   if (!gv) return NULL;
+  if (s_next_id == 0x7fffffff) s_next_id = 0;
+  gv->id = ++s_next_id;
   gv->h = *handlers;
   gv->ctx = ctx;
   gv->focus = -1;
@@ -654,6 +657,14 @@ void grid_view_push(GridView *gv) {
 
 GridView *grid_view_top(void) {
   return s_top;
+}
+
+int grid_view_id(const GridView *gv) {
+  return gv ? gv->id : 0;
+}
+
+int grid_view_top_id(void) {
+  return grid_view_id(s_top);
 }
 
 void grid_view_notify_state(void) {
