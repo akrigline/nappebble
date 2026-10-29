@@ -25,6 +25,19 @@ test('no timers running lists as an empty array', () => {
   assert.deepEqual(res.json, []);
 });
 
+test('a POST without a JSON Content-Type is 415, even with no body', () => {
+  const { mock } = setup();
+  ['start', 'stop'].forEach((action) => {
+    const res = mock.handle({
+      method: 'POST',
+      url: `https://api.nappi.app${TIMERS}/sleep/${action}`,
+      headers: { Authorization: 'Bearer t' },
+    });
+    assert.equal(res.status, 415);
+    assert.equal(JSON.parse(res.body).error.message, 'Unsupported Media Type');
+  });
+});
+
 test('starting a sleep timer returns 201 started and it shows in the list', () => {
   const { api } = setup();
   const res = api.post(TIMERS + '/sleep/start');

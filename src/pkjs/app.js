@@ -143,7 +143,10 @@ function createApp(deps) {
     return queue.flush(client).then((res) => {
       if (res.dropped.length) {
         // The API refused a write for good; whatever we showed for it is wrong.
-        res.dropped.forEach((d) => log('dropped ' + d.job.kind + ': ' + d.error.message));
+        res.dropped.forEach((d) => log(
+          'dropped ' + d.job.kind + ': ' + d.error.message + ' (HTTP ' + d.error.status + ' ' + d.error.code +
+          ', queued ' + Math.round((deps.now() - d.job.queuedAt) / 1000) + 's ago, body ' + JSON.stringify(d.job.body) + ')'
+        ));
         Object.keys(cache.perBaby).forEach((id) => { cache.perBaby[id].etag = null; });
         saveCache();
         // The watch already confirmed it; tell it (ACK_ID 0 is "not about any command").

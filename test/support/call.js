@@ -7,10 +7,9 @@ function createCaller(mock, token) {
     const opts = options || {};
     const headers = Object.assign({}, token ? { Authorization: 'Bearer ' + token } : {}, opts.headers);
     let body;
-    if (opts.body !== undefined) {
-      body = JSON.stringify(opts.body);
-      headers['Content-Type'] = 'application/json';
-    }
+    // The real API refuses a POST without a JSON Content-Type, even one with no body.
+    if (method === 'POST') headers['Content-Type'] = 'application/json';
+    if (opts.body !== undefined) body = JSON.stringify(opts.body);
     const res = mock.handle({ method, url: BASE + path, headers, body });
     let json = null;
     if (res.body) {

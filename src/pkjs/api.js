@@ -54,9 +54,11 @@ function createClient(options) {
       url: baseUrl + path,
       headers: Object.assign({ Authorization: 'Bearer ' + token, Accept: 'application/json' }, o.headers),
     };
-    if (o.body !== undefined) {
+    // nappi answers 415 to a POST without a JSON Content-Type, even where the body is optional
+    // (a timer stop with no options), so an absent body goes out as {}.
+    if (o.body !== undefined || method === 'POST') {
       req.headers['Content-Type'] = 'application/json';
-      req.body = JSON.stringify(o.body);
+      req.body = JSON.stringify(o.body === undefined ? {} : o.body);
     }
     return transport(req).then(
       (res) => parseResponse(res, o.allowNotModified),

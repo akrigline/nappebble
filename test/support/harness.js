@@ -71,7 +71,11 @@ function harness(opts) {
     api: (path, body, key) => mock.handle({
       method: body ? 'POST' : 'GET',
       url: 'https://api.nappi.app' + path,
-      headers: Object.assign({ Authorization: 'Bearer good-token' }, key ? { 'Idempotency-Key': key } : {}),
+      headers: Object.assign(
+        { Authorization: 'Bearer good-token' },
+        body ? { 'Content-Type': 'application/json' } : {},
+        key ? { 'Idempotency-Key': key } : {}
+      ),
       body: body ? JSON.stringify(body) : undefined,
     }),
     // Run scheduled callbacks that have not been cancelled, then let the engine settle.

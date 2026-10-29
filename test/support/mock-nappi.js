@@ -11,6 +11,8 @@
 //  - oz->ml uses 29.5735, rounded to one decimal; lb->kg and in->cm likewise
 //  - nursing side "both" has side null on the timer
 //  - a default sleep_type is "night" for starts between 19:00 and 07:00 local
+//  - a POST without a JSON Content-Type is 415 `unsupported_media_type` (the status is
+//    observed on timer stop; the error code is a guess)
 // Codes the docs DO name: unauthorized, token_expired, premium_required,
 // timer_not_running.
 
@@ -429,6 +431,11 @@ function createMockNappi(options) {
       if (match) { route = r; break; }
     }
     if (!route) return fail(404, 'not_found', 'No such route');
+
+    // Seen on the real API: a POST without a JSON Content-Type is refused, even when its body is optional.
+    if (req.method === 'POST' && !/^application\/json/i.test(headerOf(req.headers, 'content-type') || '')) {
+      return fail(415, 'unsupported_media_type', 'Unsupported Media Type');
+    }
 
     const limited = rateLimit(token, route.kind);
     if (limited) return limited;

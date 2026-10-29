@@ -29,7 +29,7 @@ if (process.env.SEED) {
   const post = (body) => mock.handle({
     method: 'POST',
     url: `http://x/v1/babies/${id}/entries`,
-    headers: { Authorization: 'Bearer dev-token' },
+    headers: { Authorization: 'Bearer dev-token', 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   post({ type: 'diaper', diaper_type: 'poo', time: ago(125) });

@@ -93,10 +93,23 @@ test('startTimer posts the optional body and distinguishes already_running', asy
   assert.equal(again.status, 'already_running');
 });
 
-test('startTimer with no body sends none', async () => {
+test('a timer start or stop with no options still posts an empty JSON object', async () => {
   const { client, sent } = setup();
   await client.startTimer(BABY.id, 'sleep');
-  assert.equal(sent[0].body, undefined);
+  await client.stopTimer(BABY.id, 'sleep');
+  assert.equal(sent.length, 2);
+  sent.forEach((req) => {
+    assert.equal(req.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(req.body), {});
+  });
+});
+
+test('every timer type can be started and stopped without a body', async () => {
+  const { client } = setup();
+  for (const type of ['sleep', 'nursing', 'pumping']) {
+    assert.equal((await client.startTimer(BABY.id, type)).status, 'started');
+    assert.equal((await client.stopTimer(BABY.id, type)).status, 'stopped');
+  }
 });
 
 test('stopTimer returns the saved entry; stopping again is ApiError timer_not_running', async () => {
