@@ -493,6 +493,19 @@ test('closing the settings page saves them, refreshes, and applies layout and un
   assert.deepEqual(s.LAYOUT, [P.ACTION.SLEEP, P.ACTION.DIAPER, P.ACTION.STATUS]);
 });
 
+test('closing the settings page with a rejected address keeps the old one and logs it', async () => {
+  const h = harness({ stored: { baseUrl: 'http://localhost:4010' } });
+  await h.app.handleConfigClosed({
+    token: { value: 'good-token' }, bottleUnits: { value: 'ml' },
+    baseUrl: { value: 'http://evil.example' },
+  });
+  await h.app.idle();
+  assert.equal(h.settings.get().baseUrl, 'http://localhost:4010');
+  assert.equal(h.settings.get().bottleUnits, 'ml', 'the other settings are still saved');
+  assert.ok(h.logs.includes('API address ignored: must start with https://'));
+  assert.ok(h.net.requests.every((r) => !r.url.includes('evil')));
+});
+
 test('the token is never sent to the watch', async () => {
   const h = harness();
   await h.app.handleConfigClosed({ token: { value: 'good-token' } });

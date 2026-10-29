@@ -32,6 +32,7 @@ function harness(opts) {
   const toWatch = [];
   const flight = { now: 0, max: 0 };
   const tasks = [];
+  const logs = [];
   let uuidCounter = 0;
 
   const app = createApp({
@@ -57,10 +58,11 @@ function harness(opts) {
     },
     schedule: (fn, ms) => { const t = { fn, ms, cancelled: false }; tasks.push(t); return t; },
     cancel: (t) => { t.cancelled = true; },
+    log: (m) => { logs.push(m); },
   });
 
   return {
-    app, mock, clock, net, settings, storage, toWatch, flight, tasks,
+    app, mock, clock, net, settings, storage, toWatch, flight, tasks, logs,
     reads: () => net.requests.filter((r) => r.method === 'GET'),
     writes: () => net.requests.filter((r) => r.method === 'POST'),
     // The most recent STATE message (ACKs carry no STATUS).

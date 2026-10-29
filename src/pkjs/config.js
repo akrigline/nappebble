@@ -2,7 +2,7 @@
 // what comes back. Everything stays on the phone; nothing here is sent to
 // the watch.
 
-const { DEFAULTS } = require('./settings');
+const { DEFAULTS, isAllowedBaseUrl } = require('./settings');
 const { resolveActiveBaby } = require('./babies');
 const { NAPPI_DOCS_URL } = require('./protocol');
 
@@ -121,7 +121,7 @@ function buildConfig(options) {
         type: 'input',
         messageKey: 'baseUrl',
         label: 'API address',
-        description: 'Leave as is unless testing against a mock server.',
+        description: 'Leave as is unless testing against a mock server. Must start with https://; plain http:// is only accepted for localhost and private network addresses.',
         defaultValue: settings.baseUrl,
         attributes: { type: 'url', autocomplete: 'off' }
       }
@@ -163,6 +163,21 @@ function layoutFrom(response) {
   return placed.map((p) => p.action);
 }
 
+// The typed API address, trimmed and without trailing slashes; null when the
+// response does not carry one.
+function typedBaseUrl(response) {
+  const raw = plain(response.baseUrl);
+  return typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : null;
+}
+
+// The typed API address when it is not allowed (see isAllowedBaseUrl), else null.
+// An empty field is allowed: it means "use the default".
+function rejectedBaseUrl(response) {
+  const baseUrl = typedBaseUrl(response);
+  if (baseUrl === null || baseUrl === '' || isAllowedBaseUrl(baseUrl)) return null;
+  return baseUrl;
+}
+
 function settingsFromClayResponse(response) {
   const patch = {};
   const token = plain(response.token);
@@ -176,9 +191,9 @@ function settingsFromClayResponse(response) {
     if (units === 'oz' || units === 'ml') patch[name] = units;
   });
 
-  const baseUrl = plain(response.baseUrl);
-  if (typeof baseUrl === 'string') {
-    patch.baseUrl = baseUrl.trim().replace(/\/+$/, '') || DEFAULTS.baseUrl;
+  const baseUrl = typedBaseUrl(response);
+  if (baseUrl !== null && rejectedBaseUrl(response) === null) {
+    patch.baseUrl = baseUrl || DEFAULTS.baseUrl;
   }
 
   const layout = layoutFrom(response);
@@ -193,4 +208,4 @@ function settingsFromClayResponse(response) {
   return patch;
 }
 
-module.exports = { buildConfig, settingsFromClayResponse, prefillFor, ACTION_ORDER };
+module.exports = { buildConfig, settingsFromClayResponse, rejectedBaseUrl, prefillFor, ACTION_ORDER };

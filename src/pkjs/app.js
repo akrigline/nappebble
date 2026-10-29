@@ -11,7 +11,7 @@
 // debounced re-read (latest + timers only), skipped when the budget is low.
 // Nothing polls in the background. Writes have their own limit (30/min).
 
-const { buildConfig, settingsFromClayResponse } = require('./config');
+const { buildConfig, settingsFromClayResponse, rejectedBaseUrl } = require('./config');
 const { resolveActiveBaby } = require('./babies');
 const { STATUS, describeError } = require('./protocol');
 const { createQueue, STAMP_FIELD } = require('./queue');
@@ -436,6 +436,7 @@ function createApp(deps) {
   function handleConfigClosed(response) {
     const before = settings.get();
     const patch = settingsFromClayResponse(response);
+    if (rejectedBaseUrl(response) !== null) log('API address ignored: must start with https://');
     settings.update(patch);
     if (patch.token !== undefined && patch.token !== before.token) {
       cache = emptyCache();

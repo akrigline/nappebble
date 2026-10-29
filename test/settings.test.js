@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { createSettings, DEFAULTS } = require('../src/pkjs/settings');
+const { createSettings, DEFAULTS, isAllowedBaseUrl } = require('../src/pkjs/settings');
 const { resolveActiveBaby } = require('../src/pkjs/babies');
 
 function memoryStorage(initial) {
@@ -102,4 +102,100 @@ test('with several babies and no saved choice the first is active', () => {
 
 test('a saved baby that no longer exists falls back to the first', () => {
   assert.deepEqual(resolveActiveBaby([A, B], 'gone'), { baby: A, hasChoice: true });
+});
+
+test('isAllowedBaseUrl accepts https and local or private http', () => {
+  [
+    'https://api.nappi.app',
+    'https://api.nappi.app/',
+    'HTTPS://API.NAPPI.APP',
+    'http://localhost:4010',
+    'HTTP://LOCALHOST:4010',
+    'http://127.0.0.1:4010',
+    'http://127.255.0.1',
+    'http://[::1]:4010',
+    'http://[::1]',
+    'http://192.168.1.5:4010',
+    'http://10.0.0.2',
+    'http://10.0.0.2/v1',
+    'http://172.16.0.1',
+    'http://172.31.255.1'
+  ].forEach((url) => assert.equal(isAllowedBaseUrl(url), true, url));
+});
+
+test('isAllowedBaseUrl rejects remote http and look-alikes', () => {
+  [
+    'http://example.com',
+    'http://localhost.evil.com',
+    'http://10.0.0.1.evil.com',
+    'http://172.32.0.1',
+    'http://172.15.0.1',
+    'http://192.169.0.1',
+    'http://localhost@evil.com',
+    'http://localhost:80@evil.com',
+    'http://user:pw@localhost:4010',
+    'http://localhost:80\\@evil.com',
+    'http://localhost\\@evil.com',
+    'http://localhost.',
+    'http://localhost:abc',
+    'http://010.0.0.1',
+    'http://10.0.0.256',
+    'http://10.0.0',
+    'http://10.0.0.1.2',
+    'http://[::2]',
+    'http://[::1.evil.com]',
+    'http://[::ffff:8.8.8.8]',
+    'http://[0:0:0:0:0:0:0:1]',
+    'http://::1',
+    'http://',
+    'ftp://x',
+    'file://localhost/x',
+    'javascript:alert(1)',
+    'https:/api.nappi.app',
+    'https://',
+    ' http://evil.com',
+    'http://evil.com ',
+    ' http://localhost',
+    'http://localhost ',
+    ' https://api.nappi.app',
+    'http://evil.com\t@localhost',
+    'localhost:4010',
+    'api.nappi.app',
+    '',
+    null,
+    undefined,
+    42
+  ].forEach((url) => assert.equal(isAllowedBaseUrl(url), false, JSON.stringify(url)));
+});
+
+test('a saved remote http address falls back to the default at read time', () => {
+  [
+    'http://evil.example',
+    'http://localhost.evil.com',
+    ' http://evil.example',
+    'HTTP://EVIL.EXAMPLE',
+    'http://localhost:80@evil.example',
+    '',
+    42
+  ].forEach((baseUrl) => {
+    const storage = memoryStorage({ 'nappebble.settings': JSON.stringify({ token: 't', baseUrl }) });
+    const s = createSettings(storage).get();
+    assert.equal(s.baseUrl, DEFAULTS.baseUrl, JSON.stringify(baseUrl));
+    assert.equal(s.token, 't');
+  });
+});
+
+test('a saved local or https address is kept at read time', () => {
+  ['http://localhost:4010', 'https://my.proxy.example/api', 'http://192.168.1.5:4010'].forEach((baseUrl) => {
+    const storage = memoryStorage({ 'nappebble.settings': JSON.stringify({ baseUrl }) });
+    assert.equal(createSettings(storage).get().baseUrl, baseUrl);
+  });
+});
+
+test('update cannot persist a remote http address either', () => {
+  const storage = memoryStorage();
+  const s = createSettings(storage);
+  s.update({ baseUrl: 'http://evil.example' });
+  assert.equal(s.get().baseUrl, DEFAULTS.baseUrl);
+  assert.ok(!storage.data['nappebble.settings'].includes('evil'));
 });

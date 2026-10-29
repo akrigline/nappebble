@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildConfig, settingsFromClayResponse, prefillFor } = require('../src/pkjs/config');
+const { buildConfig, settingsFromClayResponse, prefillFor, rejectedBaseUrl } = require('../src/pkjs/config');
 const { DEFAULTS } = require('../src/pkjs/settings');
 
 const A = { id: 'a', name: 'Phoebe', birth_date: null, timezone: null };
@@ -138,4 +138,31 @@ test('prefill maps each message key to the value the form should show', () => {
 test('prefill leaves out keys the page does not show', () => {
   const config = buildConfig({ settings: DEFAULTS, babies: [] });
   assert.equal('babyId' in prefillFor(config), false);
+});
+
+test('a Clay response with a rejected address leaves baseUrl out of the patch', () => {
+  const response = { token: { value: 'abc' }, baseUrl: { value: ' http://evil.example/ ' } };
+  const patch = settingsFromClayResponse(response);
+  assert.equal('baseUrl' in patch, false);
+  assert.equal(patch.token, 'abc');
+  assert.equal(rejectedBaseUrl(response), 'http://evil.example');
+  assert.equal(rejectedBaseUrl({ baseUrl: 'http://localhost:80@evil.example' }), 'http://localhost:80@evil.example');
+});
+
+test('rejectedBaseUrl is null for an allowed, empty or missing address', () => {
+  assert.equal(rejectedBaseUrl({ baseUrl: { value: 'https://api.nappi.app/' } }), null);
+  assert.equal(rejectedBaseUrl({ baseUrl: { value: 'http://localhost:4010' } }), null);
+  assert.equal(rejectedBaseUrl({ baseUrl: { value: '   ' } }), null);
+  assert.equal(rejectedBaseUrl({ token: 'x' }), null);
+  assert.equal(rejectedBaseUrl({}), null);
+});
+
+test('an allowed address is still saved without a trailing slash', () => {
+  assert.equal(settingsFromClayResponse({ baseUrl: { value: ' HTTPS://Api.Example.com/// ' } }).baseUrl, 'HTTPS://Api.Example.com');
+  assert.equal(settingsFromClayResponse({ baseUrl: { value: '' } }).baseUrl, DEFAULTS.baseUrl);
+});
+
+test('the API address field states the rule', () => {
+  const field = items(buildConfig({ settings: DEFAULTS, babies: [A] })).find((i) => i.messageKey === 'baseUrl');
+  assert.ok(field.description.includes('https://'));
 });
