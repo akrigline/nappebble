@@ -70,7 +70,7 @@ The store icons and the menu icon are made from nappi's own logo (`art/nappi-log
 
 ## Before publishing
 
-1. Try it for real. Touch on a real watch and the real nappi API have only been exercised through the mock. Publish as Unlisted first and switch to Listed after a few days of actual use.
+1. Publish as Unlisted first and switch to Listed after a few more days of use by people other than the author.
 2. Settle the affiliation line above and the icon question.
 3. Take the screenshots (page 1, page 2, a logging sheet) against the mock server. Filenames must start with the platform, for example `emery_1_home.png`.
 4. `pebble login`, then `pebble publish`. It reads the version and UUID from `package.json`, asks for the rest, and creates the listing.

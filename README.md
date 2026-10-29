@@ -1,53 +1,31 @@
 # nappebble
 
-Pebble Time 2 (Emery, touch) companion for the nappi baby tracker. C watch app plus PebbleKit JS on the phone talking to `api.nappi.app`. Spec: `docs/nappebble-spec-v2.md`. nappi API docs: <https://nappi.app/app/api/reference>. What is built, what differs from the spec, and what is unverified: `docs/implementation-notes.md`.
+Log your baby's feeds, diapers, potty, sleep and pumping to [nappi](https://nappi.app) from a Pebble Time 2. Open the app, tap a big colour tile, done: most things take two taps.
 
-## Commands
+It is a C watch app (Emery, touch) plus PebbleKit JS on the phone, which holds your API token and talks to `api.nappi.app`. Entries queue on the phone when it is offline and send when it reconnects. nappebble is an independent app and is not made by or affiliated with nappi.
+
+**You need** a Pebble Time 2, the Pebble phone app, a nappi account with Premium, and an API token from nappi (see [nappi's API docs](https://nappi.app/app/api/reference)). Paste the token into nappebble's settings in the phone app, then pick your baby.
+
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [docs/PRODUCT.md](docs/PRODUCT.md) | Every feature and its limits |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it is built, the decisions behind it, rules for changing it, known limitations |
+| [docs/store-listing.md](docs/store-listing.md) | Appstore fields, description, assets, publish checklist |
+| [AGENTS.md](AGENTS.md) | Start here if you are changing the code (human or agent) |
+
+## Develop
 
 ```sh
-npm test                        # JS tests (node:test) then host-side C tests; no Pebble tooling needed
-npm run test:js | test:c        # either half alone
-pebble build                    # emery .pbw (SDK 4.33.1)
-SEED=1 TWO_BABIES=1 npm run mock   # fake nappi API on http://127.0.0.1:4010, with some history
+npm ci
+npm test                           # JS tests then host-side C tests; no Pebble tooling needed
+pebble clean && pebble build       # emery .pbw (SDK 4.33.1)
+SEED=1 TWO_BABIES=1 npm run mock   # fake nappi API on http://127.0.0.1:4010
 pebble install --emulator emery
-pebble logs --emulator emery
-pebble screenshot --emulator emery out.png
-pebble emu-button click select down up back   # button fallback; add --duration 900 for a long press
 ```
 
-Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` (no Premium).
-
-## Driving settings in the emulator
-
-`pebble emu-app-config --emulator emery` opens the Clay page and listens on `http://localhost:<port>/close?`. The page's Save button redirects there with the form values. To skip the browser, GET that URL yourself with the URL-encoded JSON, e.g. `{"token":{"value":"dev-token"},"baseUrl":{"value":"http://localhost:4010"}}`. The port is in the generated `~/pebble-tool-emu-app-config-*.html` (`return_to=`), which the tool deletes once used.
-
-Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bottleUnits":{"value":"ml"}`. The watch changes them too: the oz / ml chips on Bottle and Pump "How much?" send `SET_UNITS` (CMD 10; args: screen 0 bottle / 1 pump, units 0 oz / 1 ml). The phone saves the unit, ACKs, then pushes state.
-
-## Layout
-
-- `src/pkjs/` phone logic. `index.js` is the only file touching Pebble globals; everything else is plain CommonJS under test.
-- `src/c/logic/` the watch's decisions as plain C (formatting, geometry, touch gestures, lockout, strips, tile text), unit-tested on the host with gcc.
-- `src/c/` the Pebble UI: one reusable `GridView` window drives Home and every sheet.
-- `src/pkjs/protocol.js` is the source of truth for enums and message keys; `src/c/logic/protocol.h` and `package.json` must match, and a test enforces it.
-- `art/icons/*.svg` are the nappi app's 24px tile icons; `node tools/make-icons.js` (after `npm i --no-save @resvg/resvg-js pngjs`) renders them to the 1-bit PNGs in `resources/icons/`. `grid_view.c` recolours them to each tile's text colour. The launcher menu icon (`menu-icon.png`) and the appstore icons in `store/` are made from `art/nappi-logo.png` by the same script and `tools/make-store-assets.js`.
-- `test/support/` mock nappi API (`mock-nappi.js`), engine harness, HTTP wrapper and dev server.
-
-## Gotchas
-
-- pkjs is bundled by webpack 1: stay within ES2015 syntax (no trailing commas in calls, no object spread, no async/await). `test/syntax.test.js` is a tripwire; `pebble build` is the authority.
-- After changing `messageKeys` in `package.json`, run `pebble clean` or the generated `MESSAGE_KEY_*` header goes stale. This includes `JS_READY`, the key the phone sends first on every start to tell the watch PebbleKit JS is up; it lives in both `src/pkjs/protocol.js` (`MESSAGE_KEYS`) and `package.json` `messageKeys`, and the protocol sync test checks that they agree. The watch treats any message from the phone as ready, so `JS_READY` itself is never read by name in C.
-- Clay builds its widgets from the config passed to its constructor, so `index.js` makes a new Clay per settings page.
-- The docs give no error code for 429 or 404; the client branches on HTTP status for 429.
-- The emulator's XHR reports a refused connection only through `readystatechange`; `xhr-transport.js` copes and has a watchdog.
-
-## Behaviour to know
-
-- **Touch turned off.** If touch is disabled in the watch's Settings, the app does not use it: the button focus ring shows at once and a one-time notice, "Touch is off. Using buttons.", appears. The notice blocks the buttons for about 2.5 seconds.
-- **The first touch after the watch idles is ignored, on purpose.** The system flags that touch as non-navigational and the app does not act on it. Acting on it could log something by accident, and there is no delete in the nappi API. Touch again.
-- **No swipe to switch nursing side.** The original spec had a swipe on the running nursing timer; it was dropped on purpose. Switching side stops one entry and starts another, a stray swipe cannot be undone, so only the "Switch side" button does it. Swiping between Home pages still works.
-- **"Logged" means the phone has the entry, not that nappi has it yet.** If there is no answer the watch says "Not confirmed. Check nappi" rather than guessing, and asks the phone for a fresh state. With "exit after log" on, the app stays open and says "Saved on your phone. Will send later" if the phone has not delivered in time.
-- **Elapsed times on Home are in whole minutes** and may lag by up to a minute.
-- **The API address must be `https://`.** Plain `http://` is accepted only for localhost and private network addresses (for testing against a dev machine); otherwise the value is ignored.
+Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` (no Premium). Set the settings page's API address to `http://localhost:4010`. More commands, the emulator workflow and the gotchas are in [AGENTS.md](AGENTS.md).
 
 ## License
 

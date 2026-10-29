@@ -7,3 +7,4 @@ node_modules/
 .env.*
 test/c/build/
 .superpowers/
+docs/superpowers/
