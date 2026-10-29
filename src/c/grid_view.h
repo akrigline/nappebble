@@ -36,6 +36,7 @@ typedef struct {
   GColor dot;
   StripGeom geom;     // CELL_STRIP: track and value range
   int32_t strip_value;
+  int16_t key;        // identity for touch: a press whose cell key changes under the finger is cancelled
 } GridCell;
 
 typedef struct GridView GridView;
@@ -81,8 +82,10 @@ void grid_view_push(GridView *gv);
 void grid_view_clear(GridView *gv);
 GridCell *grid_view_add(GridView *gv, CellKind kind, Rect rect, const char *title, const char *l1,
                         const char *l2, GColor bg);
-// Call after editing cells so touch hit-testing and drawing pick them up.
+// Call after adding or moving cells so touch hit-testing and drawing pick them up.
 void grid_view_commit(GridView *gv);
+// Text-only changes: redraw without touching the hit rects, so a finger already down stays tracked.
+void grid_view_redraw(GridView *gv);
 
 void grid_view_set_tick(GridView *gv, int secs);
 void grid_view_focus(GridView *gv, int index);

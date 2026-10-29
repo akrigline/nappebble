@@ -119,7 +119,7 @@ static void set_units(GridView *gv, int units) {
   c->value = strip_snap(&g, amount_convert(c->value, c->units, units));
   c->units = units;
   amount_refresh(gv);
-  grid_view_commit(gv);
+  grid_view_redraw(gv);
 }
 
 // Unit chips at y, then the amount strip in `strip`; adds both zones.
@@ -173,7 +173,7 @@ static void sheet_strip(GridView *gv, int cell, int x) {
     c->value = v;
     amount_refresh(gv);
   }
-  grid_view_commit(gv);
+  grid_view_redraw(gv);
 }
 
 static void sheet_adjust(GridView *gv, int zone, int dir) {
@@ -197,13 +197,13 @@ static void sheet_adjust(GridView *gv, int zone, int dir) {
     }
     default: break;
   }
-  grid_view_commit(gv);
+  grid_view_redraw(gv);
 }
 
 // The clock in the readout follows the wall clock.
 static void sheet_tick(GridView *gv) {
   time_refresh(gv);
-  grid_view_commit(gv);
+  grid_view_redraw(gv);
 }
 
 // ---- opening ----
@@ -394,7 +394,7 @@ static void status_refresh(GridView *gv) {
   model_status_text(s, line, sizeof(line));
   if (s->pending > 0) snprintf(gv->cells[STATUS_TEXT].l1, sizeof(gv->cells[STATUS_TEXT].l1), "%s\n\n%d entries waiting to send", line, (int)s->pending);
   else snprintf(gv->cells[STATUS_TEXT].l1, sizeof(gv->cells[STATUS_TEXT].l1), "%s", line);
-  grid_view_commit(gv);
+  grid_view_redraw(gv);
 }
 
 static void status_activate(GridView *gv, int index, bool long_press) {
@@ -409,5 +409,6 @@ void sheet_status(void) {
   grid_view_add(gv, CELL_TEXT, (Rect){ 8, 34, SCREEN_W - 16, 120 }, "", "", "", GColorWhite);
   grid_view_add(gv, CELL_BUTTON, (Rect){ 4, 168, SCREEN_W - 8, 52 }, "Refresh", "", "", GColorLightGray);
   status_refresh(gv);
+  grid_view_commit(gv);
   grid_view_push(gv);
 }

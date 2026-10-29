@@ -59,7 +59,7 @@ static void refresh(GridView *gv) {
   snprintf(gv->cells[CELL_SUB].l1, sizeof(gv->cells[CELL_SUB].l1), "%s", l2);
   bool running = s->timer_state[c->timer] == TIMER_STATE_RUNNING;
   if (gv->tick_secs != (running ? 1 : 0)) grid_view_set_tick(gv, running ? 1 : 0);
-  grid_view_commit(gv);
+  grid_view_redraw(gv);
 }
 
 // Once a second while running. A timer someone else stopped or paused would
@@ -124,5 +124,6 @@ void timer_view_open(int timer) {
     grid_view_add(gv, CELL_BUTTON, (Rect){ 4, 122, SCREEN_W - 8, 40 }, "Switch side", "", "", GColorBrilliantRose);
   }
   refresh(gv);
+  grid_view_commit(gv);
   grid_view_push(gv);
 }

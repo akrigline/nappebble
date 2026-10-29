@@ -23,6 +23,7 @@ static void rebuild(GridView *gv) {
   GridCell *h = grid_view_add(gv, CELL_HEADER, (Rect){ 0, 0, SCREEN_W, HEADER_H }, "",
                               timer >= 0 ? banner : name,
                               model_status_ok(s->status) ? pending : status, ui_baby_accent(s));
+  h->key = timer >= 0 ? 100 + timer : 99;
   h->enabled = timer >= 0 || s->baby_count > 1;
   h->has_dot = true;
   h->dot = !s->has_data ? GColorLightGray : (model_status_ok(s->status) ? GColorGreen : GColorRed);
@@ -36,6 +37,7 @@ static void rebuild(GridView *gv) {
     model_tile_lines(s, action, now, l1, sizeof(l1), l2, sizeof(l2));
     GridCell *c = grid_view_add(gv, CELL_TILE, layout_tile_rect(slot), model_action_title(action), l1, l2,
                                 ui_action_color(action));
+    c->key = action + 1;
     c->icon = ui_action_icon(action);
     int t = model_timer_for_action(action);
     c->selected = t >= 0 && model_timer_active(s, t);

@@ -235,7 +235,6 @@ static void redraw(GridView *gv) {
 
 void grid_view_clear(GridView *gv) {
   gv->count = 0;
-  gv->pressed = -1;
 }
 
 GridCell *grid_view_add(GridView *gv, CellKind kind, Rect rect, const char *title, const char *l1,
@@ -262,11 +261,17 @@ void grid_view_commit(GridView *gv) {
     Rect r = gv->cells[i].rect;
     if (!focusable(&gv->cells[i])) r.w = r.h = 0;
     targets[n].rect = r;
-    targets[n].key = 0;
+    targets[n].key = gv->cells[i].key;
     n++;
   }
   touch_fsm_set_targets(&gv->fsm, targets, n);
+  // A press survives only if its cell kept its key; otherwise the FSM has cancelled it.
+  gv->pressed = touch_fsm_pressed(&gv->fsm);
   if (gv->focus >= gv->count) gv->focus = gv->count - 1;
+  redraw(gv);
+}
+
+void grid_view_redraw(GridView *gv) {
   redraw(gv);
 }
 
