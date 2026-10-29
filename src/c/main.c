@@ -13,8 +13,9 @@ static void init(void) {
   ui_init();
   comm_init();
   comm_set_state_handler(on_state);
+  comm_set_link_handler(grid_view_notify_state);   // redraw only; not a state for ui.c
   home_push();
-  comm_send(CMD_REFRESH, 0, 0, 0, 0);
+  // No refresh here: the phone's start() sends state and refreshes on its own.
 }
 
 static void deinit(void) {

@@ -20,13 +20,16 @@ static void rebuild(GridView *gv) {
 
   char status[24], pending[24];
   model_tile_lines(s, ACTION_STATUS, now, status, sizeof(status), pending, sizeof(pending));
+  // Precedence: "No phone app" (red) wins over every phone-reported status.
+  bool no_phone_app = !comm_phone_responding();
+  const char *status_line = no_phone_app ? "No phone app" : (model_status_ok(s->status) ? pending : status);
   GridCell *h = grid_view_add(gv, CELL_HEADER, (Rect){ 0, 0, SCREEN_W, HEADER_H }, "",
-                              timer >= 0 ? banner : name,
-                              model_status_ok(s->status) ? pending : status, ui_baby_accent(s));
+                              timer >= 0 ? banner : name, status_line, ui_baby_accent(s));
   h->key = timer >= 0 ? 100 + timer : 99;
   h->enabled = timer >= 0 || s->baby_count > 1;
   h->has_dot = true;
-  h->dot = !s->has_data ? GColorLightGray : (model_status_ok(s->status) ? GColorGreen : GColorRed);
+  h->dot = no_phone_app ? GColorRed
+         : !s->has_data ? GColorLightGray : (model_status_ok(s->status) ? GColorGreen : GColorRed);
 
   gv->pages = layout_page_count(s->layout_count);
   if (gv->page >= gv->pages) gv->page = gv->pages - 1;

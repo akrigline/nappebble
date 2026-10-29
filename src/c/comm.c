@@ -1,5 +1,6 @@
 #include "comm.h"
 #include <string.h>
+#include "logic/ready_gate.h"
 
 // Persistent storage keys. The state is larger than one 256-byte persist
 // slot, so it is written in chunks.
@@ -15,7 +16,14 @@ static WatchState s_state;
 static CommStateHandler s_state_handler;
 static CommAckHandler s_ack_handler;
 static CommSentHandler s_sent_handler;
+static CommLinkHandler s_link_handler;
 static int s_cmd_id;
+
+// Nothing goes out until PebbleKit JS has spoken on this connection (or the
+// fallback fired): a command sent into a JS context that is still starting is
+// NACKed or lost.
+static ReadyGate s_gate;
+static AppTimer *s_ready_timer;
 
 const WatchState *comm_state(void) {
   return &s_state;
@@ -31,6 +39,14 @@ void comm_set_ack_handler(CommAckHandler handler) {
 
 void comm_set_sent_handler(CommSentHandler handler) {
   s_sent_handler = handler;
+}
+
+void comm_set_link_handler(CommLinkHandler handler) {
+  s_link_handler = handler;
+}
+
+bool comm_phone_responding(void) {
+  return !rg_not_responding(&s_gate);
 }
 
 int comm_last_cmd_id(void) {
@@ -126,14 +142,27 @@ static void apply_state(DictionaryIterator *it) {
   }
 }
 
+static void out_kick(void);
+static void ready_timer_cancel(void);
+
 static void inbox_received(DictionaryIterator *it, void *context) {
+  // Any message counts as the phone speaking, JS_READY included.
+  bool was_not_responding = rg_not_responding(&s_gate);
+  rg_on_phone_message(&s_gate);
+  ready_timer_cancel();
+
   int32_t id, result;
   if (read_int(it, MESSAGE_KEY_ACK_ID, &id) && read_int(it, MESSAGE_KEY_ACK_STATUS, &result)) {
     if (s_ack_handler) s_ack_handler((int)id, (int)result);
   }
-  if (dict_find(it, MESSAGE_KEY_STATUS)) {
-    apply_state(it);
+  // Only a dict carrying STATUS is a state; a bare {JS_READY: 1} is not.
+  bool is_state = dict_find(it, MESSAGE_KEY_STATUS) != NULL;
+  if (is_state) apply_state(it);
+  out_kick();   // anything held back for readiness may go now
+  if (is_state) {
     if (s_state_handler) s_state_handler();
+  } else if (was_not_responding && s_link_handler) {
+    s_link_handler();   // only the "No phone app" header changed
   }
 }
 
@@ -164,7 +193,7 @@ static int s_out_tries;
 static bool s_out_sending;     // handed to AppMessage, no sent/failed callback yet
 static AppTimer *s_out_timer;
 
-static void out_try(void *unused);
+static void out_try(void);
 
 static void out_pop(void) {
   s_out_count--;
@@ -172,25 +201,46 @@ static void out_pop(void) {
   s_out_tries = 0;
 }
 
+// Tries the head of the queue unless it is already with AppMessage or a retry
+// is already scheduled (that timer will try it). This guard matters because
+// the ack handler may call comm_send re-entrantly (ui.c asks for a refresh
+// from inside out_give_up): without it the nested and the outer out_try could
+// both run, burning retries and registering a second, orphaned retry timer.
+static void out_kick(void) {
+  if (s_out_count > 0 && !s_out_sending && !s_out_timer) out_try();
+}
+
 static void out_give_up(int status) {
   int id = (int)s_out[0].id;
   out_pop();
   if (s_ack_handler) s_ack_handler(id, status);
-  if (s_out_count > 0) out_try(NULL);
+  out_kick();
+}
+
+static void out_retry_fired(void *unused) {
+  s_out_timer = NULL;
+  out_kick();
 }
 
 static void out_retry(void) {
   s_out_sending = false;
   if (++s_out_tries < OUT_MAX_TRIES) {
-    s_out_timer = app_timer_register(OUT_RETRY_MS, out_try, NULL);
+    if (s_out_timer) app_timer_cancel(s_out_timer);   // never two retry timers
+    s_out_timer = app_timer_register(OUT_RETRY_MS, out_retry_fired, NULL);
     return;
   }
   out_give_up(COMM_ACK_NOT_SENT);
 }
 
-static void out_try(void *unused) {
-  s_out_timer = NULL;
+static void out_try(void) {
   if (s_out_count == 0 || s_out_sending) return;
+  if (!rg_may_send(&s_gate)) {
+    // Not ready: hold it (no retry consumed) until the phone speaks or the
+    // fallback fires. With no phone at all neither will happen, so give up
+    // rather than leave the UI waiting; out_give_up moves on to the rest.
+    if (!connection_service_peek_pebble_app_connection()) out_give_up(COMM_ACK_NOT_SENT);
+    return;
+  }
   DictionaryIterator *it;
   AppMessageResult r = app_message_outbox_begin(&it);
   if (r == APP_MSG_OK) {
@@ -213,9 +263,10 @@ static void out_try(void *unused) {
 }
 
 static void outbox_sent(DictionaryIterator *it, void *context) {
+  if (s_out_count == 0) return;
   s_out_sending = false;
   out_pop();
-  if (s_out_count > 0) out_try(NULL);
+  out_kick();
 }
 
 static void outbox_failed(DictionaryIterator *it, AppMessageResult reason, void *context) {
@@ -227,6 +278,38 @@ static void outbox_failed(DictionaryIterator *it, AppMessageResult reason, void 
   } else {
     out_give_up(COMM_ACK_NO_REPLY);
   }
+}
+
+// ---- readiness ----
+
+static void ready_timer_cancel(void) {
+  if (s_ready_timer) app_timer_cancel(s_ready_timer);
+  s_ready_timer = NULL;
+}
+
+static void ready_fallback(void *unused) {
+  s_ready_timer = NULL;
+  bool was_not_responding = rg_not_responding(&s_gate);
+  rg_on_fallback(&s_gate);
+  out_kick();   // send anyway; the retry logic then applies
+  if (rg_not_responding(&s_gate) != was_not_responding && s_link_handler) s_link_handler();
+}
+
+static void ready_arm(void) {
+  ready_timer_cancel();
+  s_ready_timer = app_timer_register(READY_FALLBACK_MS, ready_fallback, NULL);
+}
+
+// PebbleKit JS starts a fresh context on reconnect, so readiness is per connection.
+static void on_phone_connection(bool connected) {
+  bool was_not_responding = rg_not_responding(&s_gate);
+  rg_on_connection(&s_gate, connected);
+  if (connected) ready_arm();
+  else ready_timer_cancel();
+  // Disconnected: queued commands that are not with AppMessage are given up
+  // (see out_try); one in flight ends through its outbox callback.
+  out_kick();
+  if (was_not_responding && s_link_handler) s_link_handler();
 }
 
 bool comm_send(int cmd, int32_t a1, int32_t a2, int32_t a3, int32_t a4) {
@@ -243,7 +326,7 @@ bool comm_send(int cmd, int32_t a1, int32_t a2, int32_t a3, int32_t a4) {
   // Name the baby the watch is showing, so the phone can refuse if it has moved on.
   c->has_baby = s_state.has_data;
   c->baby_index = s_state.baby_index;
-  if (s_out_count == 1) out_try(NULL);
+  out_kick();   // held until ready; otherwise sends now if nothing is ahead of it
   return true;
 }
 
@@ -257,8 +340,13 @@ void comm_init(void) {
   app_message_register_outbox_sent(outbox_sent);
   app_message_register_outbox_failed(outbox_failed);
   app_message_open(INBOX_SIZE, OUTBOX_SIZE);
+  rg_init(&s_gate);
+  connection_service_subscribe((ConnectionHandlers){ .pebble_app_connection_handler = on_phone_connection });
+  if (connection_service_peek_pebble_app_connection()) ready_arm();
 }
 
 void comm_deinit(void) {
+  connection_service_unsubscribe();
+  ready_timer_cancel();
   persist_state();
 }
