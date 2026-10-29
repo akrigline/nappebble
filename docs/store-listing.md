@@ -63,7 +63,7 @@ First release (early version). Log diapers, bottles, potty, and sleep, nursing a
 | Small icon | 80x80 | `store/icon-small.png` | Done |
 | Large icon | 144x144 | `store/icon-large.png` | Done |
 | Menu icon (in the .pbw) | 25x25 | `resources/icons/menu-icon.png` | Done |
-| Screenshots | 200x228 each, up to 5, no frame | `store/screenshots/emery_*.png` | One taken, to be retaken |
+| Screenshots | 200x228 each, up to 5, no frame | none yet (see the checklist below) | Not taken |
 | Banner | 720x320, optional | none | Skipped |
 
 The store icons and the menu icon are made from nappi's own logo (`art/nappi-logo.png`; `node tools/make-store-assets.js` and `node tools/make-icons.js`). That is nappi's artwork, so get nappi's agreement to use it before a public listing, and note it sits oddly beside the "not affiliated" line above: if you do have their blessing, reword that line to say so.
