@@ -64,6 +64,25 @@ TEST(duration_minutes) {
   fmt_duration_min(b, sizeof b, 72);  CHECK_STR(b, "1h 12m");
 }
 
+TEST(elapsed_min_boundaries) {
+  char b[16];
+  fmt_elapsed_min(b, sizeof b, -5);    CHECK_STR(b, "<1m");
+  fmt_elapsed_min(b, sizeof b, 0);     CHECK_STR(b, "<1m");
+  fmt_elapsed_min(b, sizeof b, 59);    CHECK_STR(b, "<1m");
+  fmt_elapsed_min(b, sizeof b, 60);    CHECK_STR(b, "1m");
+  fmt_elapsed_min(b, sizeof b, 3599);  CHECK_STR(b, "59m");
+  fmt_elapsed_min(b, sizeof b, 3600);  CHECK_STR(b, "1h");
+  fmt_elapsed_min(b, sizeof b, 3660);  CHECK_STR(b, "1h 1m");
+  fmt_elapsed_min(b, sizeof b, 4324);  CHECK_STR(b, "1h 12m");
+}
+
+TEST(elapsed_min_never_overflows_a_small_buffer) {
+  char b[4];
+  fmt_elapsed_min(b, sizeof b, 4324);  CHECK(strlen(b) <= 3);
+  fmt_elapsed_min(b, sizeof b, 30);    CHECK_STR(b, "<1m");
+  fmt_elapsed_min(b, sizeof b, -5);    CHECK_STR(b, "<1m");
+}
+
 int main(void) {
   RUN(ago_formats_each_range);
   RUN(ago_treats_a_future_timestamp_as_now);
@@ -72,5 +91,7 @@ int main(void) {
   RUN(amount_in_oz_and_ml);
   RUN(strip_time_readout);
   RUN(duration_minutes);
+  RUN(elapsed_min_boundaries);
+  RUN(elapsed_min_never_overflows_a_small_buffer);
   FINISH();
 }

@@ -135,17 +135,17 @@ TEST(a_running_timer_replaces_the_tile_text_with_its_clock) {
   s.timer_state[TIMER_SLEEP] = TIMER_STATE_RUNNING;
   s.timer_elapsed[TIMER_SLEEP] = 4324;
   model_tile_lines(&s, ACTION_SLEEP, NOW, l1, sizeof l1, l2, sizeof l2);
-  CHECK_STR(l1, "1:12:04"); CHECK_STR(l2, "Sleeping");
+  CHECK_STR(l1, "1h 12m"); CHECK_STR(l2, "Sleeping");
 
   s.timer_state[TIMER_NURSING] = TIMER_STATE_RUNNING;
   s.timer_elapsed[TIMER_NURSING] = 252;
   s.timer_side[TIMER_NURSING] = SIDE_LEFT;
   model_tile_lines(&s, ACTION_NURSING, NOW + 8, l1, sizeof l1, l2, sizeof l2);
-  CHECK_STR(l1, "4:20"); CHECK_STR(l2, "Left");
+  CHECK_STR(l1, "4m"); CHECK_STR(l2, "Left");
 
   s.timer_state[TIMER_NURSING] = TIMER_STATE_PAUSED;
   model_tile_lines(&s, ACTION_NURSING, NOW + 8, l1, sizeof l1, l2, sizeof l2);
-  CHECK_STR(l1, "4:12"); CHECK_STR(l2, "Paused");
+  CHECK_STR(l1, "4m"); CHECK_STR(l2, "Paused");
 }
 
 TEST(the_banner_shows_the_running_timer) {
@@ -157,9 +157,9 @@ TEST(the_banner_shows_the_running_timer) {
   s.timer_state[TIMER_SLEEP] = TIMER_STATE_RUNNING;
   s.timer_elapsed[TIMER_SLEEP] = 4324;
   CHECK_INT(model_banner(&s, NOW, b, sizeof b), TIMER_SLEEP);
-  CHECK_STR(b, "Sleeping 1:12:04");
+  CHECK_STR(b, "Sleeping 1h 12m");
   model_banner(&s, NOW + 10, b, sizeof b);
-  CHECK_STR(b, "Sleeping 1:12:14");
+  CHECK_STR(b, "Sleeping 1h 12m");
 }
 
 TEST(the_banner_names_the_nursing_side_and_marks_pauses) {
@@ -169,10 +169,10 @@ TEST(the_banner_names_the_nursing_side_and_marks_pauses) {
   s.timer_elapsed[TIMER_NURSING] = 252;
   s.timer_side[TIMER_NURSING] = SIDE_RIGHT;
   CHECK_INT(model_banner(&s, NOW, b, sizeof b), TIMER_NURSING);
-  CHECK_STR(b, "Nursing R 4:12");
+  CHECK_STR(b, "Nursing R 4m");
   s.timer_state[TIMER_NURSING] = TIMER_STATE_PAUSED;
   model_banner(&s, NOW + 60, b, sizeof b);
-  CHECK_STR(b, "Nursing paused 4:12");
+  CHECK_STR(b, "Nursing paused 4m");
 }
 
 TEST(with_several_timers_the_lowest_numbered_wins) {

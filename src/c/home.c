@@ -46,12 +46,6 @@ static void rebuild(GridView *gv) {
     c->selected = t >= 0 && model_timer_active(s, t);
   }
   grid_view_commit(gv);
-
-  bool running = false;
-  for (int t = 0; t < TIMER_COUNT; t++) {
-    if (s->timer_state[t] == TIMER_STATE_RUNNING) running = true;
-  }
-  if (gv->tick_secs != (running ? 1 : 60)) grid_view_set_tick(gv, running ? 1 : 60);
 }
 
 static void open_action(int action, bool long_press) {
@@ -120,6 +114,7 @@ void home_push(void) {
   GridHandlers handlers = { .on_activate = on_activate, .on_swipe = on_swipe, .on_tick = on_tick, .on_state = on_state };
   GridView *gv = grid_view_create(&handlers, NULL);
   if (!gv) return;
+  grid_view_set_tick(gv, 60);   // Home shows minutes only: one tick a minute, set once
   rebuild(gv);
   ui_set_home_window(gv->window);
   grid_view_push(gv);

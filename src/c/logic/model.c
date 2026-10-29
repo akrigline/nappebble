@@ -143,7 +143,7 @@ void model_tile_lines(const WatchState *s, int action, int32_t now,
 
   int timer = model_timer_for_action(action);
   if (timer >= 0 && model_timer_active(s, timer)) {
-    fmt_clock(l1, n1, model_timer_elapsed(s, timer, now));
+    fmt_elapsed_min(l1, n1, model_timer_elapsed(s, timer, now));
     if (s->timer_state[timer] == TIMER_STATE_PAUSED) snprintf(l2, n2, "Paused");
     else if (timer == TIMER_NURSING && s->timer_side[timer] != SIDE_NONE) snprintf(l2, n2, "%s", model_side_label(s->timer_side[timer]));
     else if (timer == TIMER_NURSING) snprintf(l2, n2, "Nursing");
@@ -168,7 +168,7 @@ int model_banner(const WatchState *s, int32_t now, char *buf, size_t n) {
   for (int t = 0; t < TIMER_COUNT; t++) {
     if (!model_timer_active(s, t)) continue;
     char clock[16];
-    fmt_clock(clock, sizeof clock, model_timer_elapsed(s, t, now));
+    fmt_elapsed_min(clock, sizeof clock, model_timer_elapsed(s, t, now));
     bool paused = s->timer_state[t] == TIMER_STATE_PAUSED;
     if (t == TIMER_SLEEP) {
       snprintf(buf, n, paused ? "Sleep paused %s" : "Sleeping %s", clock);

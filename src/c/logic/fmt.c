@@ -37,6 +37,11 @@ void fmt_duration_min(char *buf, size_t n, int minutes) {
   else snprintf(buf, n, "%dh %dm", minutes / 60, minutes % 60);
 }
 
+void fmt_elapsed_min(char *buf, size_t n, int32_t seconds) {
+  if (seconds < 60) snprintf(buf, n, "<1m");
+  else fmt_duration_min(buf, n, (int)(seconds / 60));
+}
+
 void fmt_strip_time(char *buf, size_t n, int minutes_ago, int hour, int minute, bool is24h) {
   char when[16];
   if (is24h) {
