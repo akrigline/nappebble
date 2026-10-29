@@ -210,6 +210,9 @@ static void on_ack(int id, int status) {
   if (id == 0) {
     // The phone speaking unprompted: nappi refused a write we had confirmed.
     if (status == STATUS_REJECTED) {
+      // Not delivered after all: an exit wait must not close the app as if it were.
+      sf_on_unprompted_reject(&s_flow);
+      sync_exit_timer();
       vibes_double_pulse();
       if (top) grid_view_flash(top, 2, "nappi rejected a log", 3000, NULL);
     }

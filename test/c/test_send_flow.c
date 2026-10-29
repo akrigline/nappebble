@@ -132,6 +132,30 @@ TEST(a_new_begin_cancels_an_exit_wait) {
   CHECK(sf_busy(&f));
 }
 
+TEST(an_unprompted_reject_cancels_an_exit_wait) {
+  SendFlow f = awaiting(7, 1);
+  sf_on_ack(&f, 7, STATUS_OK, 1);
+  CHECK_INT(sf_after_logged(&f, true, 1), SF_WAIT_DELIVERY);
+  sf_on_unprompted_reject(&f);
+  CHECK_INT(f.phase, SF_IDLE);
+  CHECK_INT(sf_on_state(&f, 0, 1), SF_NOTHING);
+}
+
+TEST(an_unprompted_reject_leaves_an_awaited_command_alone) {
+  SendFlow f = awaiting(7, 1);
+  sf_on_unprompted_reject(&f);
+  CHECK_INT(f.phase, SF_AWAITING);
+  CHECK(sf_busy(&f));
+  CHECK_INT(sf_pending_id(&f), 7);
+}
+
+TEST(an_unprompted_reject_while_idle_changes_nothing) {
+  SendFlow f; sf_init(&f);
+  sf_on_unprompted_reject(&f);
+  CHECK_INT(f.phase, SF_IDLE);
+  CHECK(!sf_busy(&f));
+}
+
 int main(void) {
   RUN(a_second_begin_is_refused_while_awaiting);
   RUN(a_matching_ok_ack_confirms_and_navigates_only_from_the_sending_view);
@@ -144,5 +168,8 @@ int main(void) {
   RUN(exit_wait_is_cancelled_when_the_view_is_no_longer_on_top);
   RUN(exit_timeout_stays_open_only_if_the_view_is_still_on_top);
   RUN(a_new_begin_cancels_an_exit_wait);
+  RUN(an_unprompted_reject_cancels_an_exit_wait);
+  RUN(an_unprompted_reject_leaves_an_awaited_command_alone);
+  RUN(an_unprompted_reject_while_idle_changes_nothing);
   FINISH();
 }

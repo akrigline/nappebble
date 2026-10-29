@@ -76,3 +76,7 @@ SfNext sf_on_exit_timeout(SendFlow *f, int top_view) {
   f->phase = SF_IDLE;
   return top_view == f->view ? SF_STAY_OPEN : SF_NOTHING;
 }
+
+void sf_on_unprompted_reject(SendFlow *f) {
+  if (f->phase == SF_EXIT_WAIT) f->phase = SF_IDLE;
+}

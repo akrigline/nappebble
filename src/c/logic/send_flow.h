@@ -53,3 +53,8 @@ SfNext sf_on_state(SendFlow *f, int32_t pending, int top_view);
 
 // The exit-wait timer fired.
 SfNext sf_on_exit_timeout(SendFlow *f, int top_view);
+
+// The phone said, unprompted, that nappi refused a write. Ends an exit wait
+// (the app must not close as if delivered); an awaited command keeps waiting
+// for its own ack.
+void sf_on_unprompted_reject(SendFlow *f);
