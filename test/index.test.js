@@ -112,11 +112,18 @@ test('on ready it syncs and sends the state to the watch using wire keys', async
   assert.equal(state.PUMP_UNITS, P.UNITS.OZ);
 });
 
+test('on ready the first message to the watch is JS_READY', async () => {
+  const b = boot();
+  b.fire('ready', {});
+  await b.settle();
+  assert.deepEqual(b.sent[0], { JS_READY: 1 });
+});
+
 test('with no token on ready it reports NO_TOKEN and makes no HTTP request', async () => {
   const b = boot({ token: '' });
   b.fire('ready', {});
   await b.settle();
-  assert.equal(b.sent[0].STATUS, P.STATUS.NO_TOKEN);
+  assert.equal(b.sent.find((d) => 'STATUS' in d).STATUS, P.STATUS.NO_TOKEN);
   assert.equal(b.requests.length, 0);
 });
 

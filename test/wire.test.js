@@ -19,6 +19,10 @@ test('scalar values pass through by name', () => {
   assert.deepEqual(toWire({ STATUS: 0, BABY_NAME: 'Phoebe' }, fakeIds()), { STATUS: 0, BABY_NAME: 'Phoebe' });
 });
 
+test('JS_READY passes through toWire as a plain key', () => {
+  assert.deepEqual(toWire({ JS_READY: 1 }, fakeIds()), { JS_READY: 1 });
+});
+
 test('array-declared keys expand to consecutive numeric keys', () => {
   const ids = fakeIds();
   const wire = toWire({ INFO: [20, 30, 40, 50, 60, 70, 80] }, ids);

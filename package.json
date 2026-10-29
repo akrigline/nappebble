@@ -59,7 +59,8 @@
       "TIMER_ELAPSED[3]",
       "TIMER_SIDE[3]",
       "TIMER_AT",
-      "PENDING"
+      "PENDING",
+      "JS_READY"
     ],
     "resources": {
       "media": [

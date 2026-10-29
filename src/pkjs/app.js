@@ -401,6 +401,8 @@ function createApp(deps) {
   // ---- lifecycle and settings ----
 
   function start() {
+    // First thing on every start: tell the watch PebbleKit JS is up. sendChain keeps it ahead of any state.
+    send({ JS_READY: 1 });
     const s = settings.get();
     if (!s.token) {
       cache = emptyCache();

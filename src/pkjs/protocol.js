@@ -90,6 +90,7 @@ const MESSAGE_KEYS = [
   'TIMER_SIDE[' + Object.keys(TIMER).length + ']',
   'TIMER_AT',
   'PENDING',
+  'JS_READY',
 ];
 
 // nappi's own API documentation, which says how to create a token. We link to it rather than restating it.

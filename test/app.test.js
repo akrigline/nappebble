@@ -17,6 +17,20 @@ test('with no token the watch is told so and no request is made', async () => {
   assert.equal('BABY_NAME' in h.state(), false);
 });
 
+test('start sends JS_READY before any state', async () => {
+  const h = harness();
+  await h.app.start();
+  assert.deepEqual(h.toWatch[0], { JS_READY: 1 });
+  assert.ok(h.toWatch.slice(1).some((d) => 'STATUS' in d));
+});
+
+test('start without a token still sends JS_READY first', async () => {
+  const h = harness({ token: '' });
+  await h.app.start();
+  assert.deepEqual(h.toWatch[0], { JS_READY: 1 });
+  assert.equal(h.toWatch[1].STATUS, P.STATUS.NO_TOKEN);
+});
+
 test('a first start reads babies, latest and timers, and sends the full state', async () => {
   const h = harness();
   await h.app.start();
