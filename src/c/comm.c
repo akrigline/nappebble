@@ -7,7 +7,7 @@
 #define PERSIST_VERSION_KEY 100
 #define PERSIST_CHUNK_KEY 101
 #define PERSIST_CHUNK_SIZE 200
-#define PERSIST_VERSION 1
+#define PERSIST_VERSION 2
 
 #define INBOX_SIZE 1024
 #define OUTBOX_SIZE 128
@@ -56,7 +56,10 @@ int comm_last_cmd_id(void) {
 // ---- persistence ----
 
 static void persist_state(void) {
-  if (!s_state.has_data) return;
+  if (!s_state.has_data) {
+    persist_delete(PERSIST_VERSION_KEY);
+    return;
+  }
   const uint8_t *bytes = (const uint8_t *)&s_state;
   size_t total = sizeof(s_state);
   persist_write_int(PERSIST_VERSION_KEY, PERSIST_VERSION * 100000 + (int)total);
@@ -78,6 +81,7 @@ static void load_persisted(void) {
     if (persist_read_data(key, bytes + offset, n) != (int)n) return;
   }
   s_state = loaded;
+  s_state.from_cache = s_state.has_data;
 }
 
 // ---- inbox ----
@@ -101,6 +105,7 @@ static void apply_state(DictionaryIterator *it) {
   int32_t v;
   Tuple *t;
 
+  s->from_cache = false;
   if (read_int(it, MESSAGE_KEY_STATUS, &v)) s->status = (uint8_t)v;
   s->retry_after = read_int(it, MESSAGE_KEY_RETRY_AFTER, &v) ? v : 0;
   if (read_int(it, MESSAGE_KEY_BOTTLE_UNITS, &v)) s->bottle_units = (uint8_t)v;

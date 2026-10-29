@@ -29,7 +29,7 @@ static void rebuild(GridView *gv) {
   h->enabled = timer >= 0 || s->baby_count > 1;
   h->has_dot = true;
   h->dot = no_phone_app ? GColorRed
-         : !s->has_data ? GColorLightGray : (model_status_ok(s->status) ? GColorGreen : GColorRed);
+         : (!s->has_data || s->from_cache) ? GColorLightGray : (model_status_ok(s->status) ? GColorGreen : GColorRed);
 
   gv->pages = layout_page_count(s->layout_count);
   if (gv->page >= gv->pages) gv->page = gv->pages - 1;

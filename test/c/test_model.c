@@ -199,6 +199,31 @@ TEST(the_status_tile_reports_sync_state_and_pending_writes) {
   CHECK_STR(l1, "Wait 40s");
 }
 
+TEST(a_cached_state_says_cached) {
+  WatchState s = fresh();
+  char l1[24], l2[24], b[96];
+  s.from_cache = true;
+  model_tile_lines(&s, ACTION_STATUS, NOW, l1, sizeof l1, l2, sizeof l2);
+  CHECK_STR(l1, "Cached");
+  model_status_text(&s, b, sizeof b);
+  CHECK_STR(b, "Showing the last saved state. Waiting for the phone");
+}
+
+TEST(a_live_state_does_not) {
+  WatchState s = fresh();
+  char l1[24], l2[24], b[96];
+  model_tile_lines(&s, ACTION_STATUS, NOW, l1, sizeof l1, l2, sizeof l2);
+  CHECK_STR(l1, "Synced");
+  model_status_text(&s, b, sizeof b);
+  CHECK_STR(b, "Connected to nappi");
+}
+
+TEST(default_state_is_not_from_cache) {
+  WatchState s;
+  model_default(&s);
+  CHECK(!s.from_cache);
+}
+
 TEST(status_has_a_sentence_for_every_state) {
   char b[96];
   for (int st = 0; st <= STATUS_ERROR; st++) {
@@ -249,6 +274,9 @@ int main(void) {
   RUN(the_banner_names_the_nursing_side_and_marks_pauses);
   RUN(with_several_timers_the_lowest_numbered_wins);
   RUN(the_status_tile_reports_sync_state_and_pending_writes);
+  RUN(a_cached_state_says_cached);
+  RUN(a_live_state_does_not);
+  RUN(default_state_is_not_from_cache);
   RUN(status_has_a_sentence_for_every_state);
   RUN(only_ok_counts_as_healthy);
   RUN(baby_names_are_split_from_the_newline_joined_string);

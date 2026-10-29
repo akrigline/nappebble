@@ -79,6 +79,7 @@ bool model_status_ok(int status) {
 }
 
 static void status_short(const WatchState *s, char *buf, size_t n) {
+  if (s->from_cache) { snprintf(buf, n, "Cached"); return; }
   switch (s->status) {
     case STATUS_OK: snprintf(buf, n, "Synced"); break;
     case STATUS_NO_TOKEN: snprintf(buf, n, "No token"); break;
@@ -93,6 +94,7 @@ static void status_short(const WatchState *s, char *buf, size_t n) {
 }
 
 void model_status_text(const WatchState *s, char *buf, size_t n) {
+  if (s->from_cache) { snprintf(buf, n, "Showing the last saved state. Waiting for the phone"); return; }
   switch (s->status) {
     case STATUS_OK: snprintf(buf, n, "Connected to nappi"); break;
     case STATUS_NO_TOKEN: snprintf(buf, n, "Enter your API token in the phone app's settings"); break;

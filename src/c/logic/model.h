@@ -13,6 +13,7 @@ typedef struct {
   uint8_t status;
   int32_t retry_after;
   bool has_data;
+  bool from_cache;                   // loaded from persist, not yet confirmed by the phone
 
   char baby_name[BABY_NAME_LEN];
   char baby_names[BABY_NAMES_LEN];   // newline-joined
@@ -36,6 +37,11 @@ typedef struct {
 
   int32_t pending;                   // writes the phone has not delivered yet
 } WatchState;
+
+// The struct is persisted as a raw blob on the watch: changing WatchState
+// means bumping PERSIST_VERSION in comm.c. Only int32_t/uint8_t/bool/char
+// members, so the size is the same on the host and on the 32-bit ARM watch.
+typedef char watchstate_size_check[(sizeof(WatchState) == 232) ? 1 : -1];
 
 void model_default(WatchState *s);
 
