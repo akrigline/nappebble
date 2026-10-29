@@ -8,7 +8,8 @@
 #include "logic/strip.h"
 #include "logic/nav.h"
 
-#define GRID_MAX_CELLS 20
+// One capacity for cells and touch rects, so every cell is hit-testable.
+#define GRID_MAX_CELLS TOUCH_MAX_RECTS
 
 enum { FONT_BODY = 0, FONT_VALUE = 1, FONT_CLOCK = 2 };
 

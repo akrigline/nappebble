@@ -54,6 +54,7 @@ static GBitmap *icon_bitmap(uint32_t res) {
       return s_icons[i].bmp;
     }
   }
+  APP_LOG(APP_LOG_LEVEL_ERROR, "icon cache full (%d), icon %lu not drawn", ICON_CACHE, (unsigned long)res);
   return NULL;
 }
 
@@ -241,7 +242,13 @@ void grid_view_clear(GridView *gv) {
 
 GridCell *grid_view_add(GridView *gv, CellKind kind, Rect rect, const char *title, const char *l1,
                         const char *l2, GColor bg) {
-  if (gv->count >= GRID_MAX_CELLS) return &gv->cells[GRID_MAX_CELLS - 1];
+  if (gv->count >= GRID_MAX_CELLS) {
+    // Hand back a scratch cell so a caller's writes cannot corrupt a real one.
+    static GridCell s_overflow;
+    APP_LOG(APP_LOG_LEVEL_ERROR, "grid_view_add: more than %d cells, dropping one", GRID_MAX_CELLS);
+    memset(&s_overflow, 0, sizeof(s_overflow));
+    return &s_overflow;
+  }
   GridCell *c = &gv->cells[gv->count++];
   memset(c, 0, sizeof(*c));
   c->rect = rect;
@@ -658,12 +665,15 @@ GridView *grid_view_create(const GridHandlers *handlers, void *ctx) {
   });
   window_set_click_config_provider_with_context(gv->window, click_config, gv);
 
+  bool placed = false;
   for (int i = 0; i < MAX_LIVE_VIEWS; i++) {
     if (!s_live[i]) {
       s_live[i] = gv;
+      placed = true;
       break;
     }
   }
+  if (!placed) APP_LOG(APP_LOG_LEVEL_ERROR, "no free live-view slot (%d); state updates will skip this view", MAX_LIVE_VIEWS);
   return gv;
 }
 

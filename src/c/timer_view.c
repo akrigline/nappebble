@@ -96,18 +96,13 @@ static void on_activate(GridView *gv, int index, bool long_press) {
   }
 }
 
-static void on_swipe(GridView *gv, int direction) {
-  TimerCtx *c = gv->ctx;
-  if (c->timer == TIMER_NURSING) switch_side(gv);
-}
-
 void timer_view_open(int timer) {
   if (timer < 0 || timer >= TIMER_COUNT) return;
   TimerCtx *c = calloc(1, sizeof(TimerCtx));
   if (!c) return;
   c->timer = timer;
 
-  GridHandlers h = { .on_activate = on_activate, .on_swipe = on_swipe, .on_tick = on_tick, .on_state = refresh, .on_unload = free_ctx };
+  GridHandlers h = { .on_activate = on_activate, .on_tick = on_tick, .on_state = refresh, .on_unload = free_ctx };
   GridView *gv = grid_view_create(&h, c);
   if (!gv) {
     free(c);

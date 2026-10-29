@@ -1,3 +1,7 @@
+#if !defined(PBL_PLATFORM_EMERY)
+#error "nappebble targets Emery only; the layout is hard-coded to 200x228 (see docs/superpowers/specs/2026-10-28-review-fixes-design.md)"
+#endif
+
 #include <pebble.h>
 #include "comm.h"
 #include "grid_view.h"
