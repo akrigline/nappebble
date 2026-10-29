@@ -3,9 +3,9 @@
 
 // Two buttons side by side: rect 0 at x 0..99, rect 1 at x 100..199, y 50..149.
 static void setup(TouchFsm *f) {
-  Rect rects[2] = { { 0, 50, 100, 100 }, { 100, 50, 100, 100 } };
+  TouchTarget targets[2] = { { { 0, 50, 100, 100 }, 1 }, { { 100, 50, 100, 100 }, 2 } };
   touch_fsm_init(f);
-  touch_fsm_set_rects(f, rects, 2);
+  touch_fsm_set_targets(f, targets, 2);
 }
 
 static void check_none(TouchResult r) {
@@ -131,12 +131,63 @@ TEST(a_new_touchdown_resets_a_gesture_whose_liftoff_was_missed) {
   CHECK_INT(touch_fsm_up(&f, 150, 100, 600).activate, 1);
 }
 
-TEST(set_rects_resets_an_active_gesture) {
+TEST(set_targets_keeps_a_tap_when_rect_and_key_are_unchanged) {
   TouchFsm f; setup(&f);
   touch_fsm_down(&f, 50, 100, 0);
-  Rect other[1] = { { 0, 0, 200, 228 } };
-  touch_fsm_set_rects(&f, other, 1);
-  check_none(touch_fsm_up(&f, 50, 100, 100));
+  TouchTarget same[2] = { { { 0, 50, 100, 100 }, 1 }, { { 100, 50, 100, 100 }, 2 } };
+  touch_fsm_set_targets(&f, same, 2);
+  CHECK_INT(touch_fsm_up(&f, 50, 100, 100).activate, 0);
+}
+
+TEST(set_targets_keeps_a_long_press_when_identity_is_unchanged) {
+  TouchFsm f; setup(&f);
+  touch_fsm_down(&f, 50, 100, 0);
+  TouchTarget same[2] = { { { 0, 50, 100, 100 }, 1 }, { { 100, 50, 100, 100 }, 2 } };
+  touch_fsm_set_targets(&f, same, 2);
+  CHECK_INT(touch_fsm_tick(&f, LONG_PRESS_MS).long_press, 0);
+}
+
+TEST(set_targets_cancels_when_the_rect_changes) {
+  TouchFsm f; setup(&f);
+  touch_fsm_down(&f, 50, 100, 0);
+  TouchTarget other[2] = { { { 0, 50, 90, 100 }, 1 }, { { 100, 50, 100, 100 }, 2 } };
+  touch_fsm_set_targets(&f, other, 2);
+  CHECK_INT(touch_fsm_up(&f, 50, 100, 100).activate, -1);
+}
+
+TEST(set_targets_cancels_when_only_the_key_changes) {
+  TouchFsm f; setup(&f);
+  touch_fsm_down(&f, 50, 100, 0);
+  TouchTarget rekeyed[2] = { { { 0, 50, 100, 100 }, 9 }, { { 100, 50, 100, 100 }, 2 } };
+  touch_fsm_set_targets(&f, rekeyed, 2);
+  CHECK_INT(touch_fsm_up(&f, 50, 100, 100).activate, -1);
+}
+
+TEST(set_targets_cancels_when_the_target_index_no_longer_exists) {
+  TouchFsm f; setup(&f);
+  touch_fsm_down(&f, 150, 100, 0);
+  TouchTarget one[1] = { { { 0, 50, 100, 100 }, 1 } };
+  touch_fsm_set_targets(&f, one, 1);
+  CHECK_INT(touch_fsm_up(&f, 150, 100, 100).activate, -1);
+}
+
+TEST(a_gesture_on_empty_space_survives_set_targets_and_can_swipe) {
+  TouchFsm f; setup(&f);
+  touch_fsm_down(&f, 50, 10, 0);
+  TouchTarget other[1] = { { { 0, 50, 200, 100 }, 5 } };
+  touch_fsm_set_targets(&f, other, 1);
+  CHECK_INT(touch_fsm_move(&f, 50 - 60, 12, 50).swipe, SWIPE_LEFT);
+}
+
+TEST(pressed_reports_the_live_target_only) {
+  TouchFsm f; setup(&f);
+  CHECK_INT(touch_fsm_pressed(&f), -1);
+  touch_fsm_down(&f, 50, 100, 0);
+  CHECK_INT(touch_fsm_pressed(&f), 0);
+  touch_fsm_move(&f, 50, 160, 50);
+  CHECK_INT(touch_fsm_pressed(&f), -1);
+  touch_fsm_up(&f, 50, 160, 100);
+  CHECK_INT(touch_fsm_pressed(&f), -1);
 }
 
 TEST(sequential_taps_each_work) {
@@ -163,7 +214,13 @@ int main(void) {
   RUN(a_mostly_vertical_move_is_not_a_swipe);
   RUN(a_swipe_fires_once_per_gesture);
   RUN(a_new_touchdown_resets_a_gesture_whose_liftoff_was_missed);
-  RUN(set_rects_resets_an_active_gesture);
+  RUN(set_targets_keeps_a_tap_when_rect_and_key_are_unchanged);
+  RUN(set_targets_keeps_a_long_press_when_identity_is_unchanged);
+  RUN(set_targets_cancels_when_the_rect_changes);
+  RUN(set_targets_cancels_when_only_the_key_changes);
+  RUN(set_targets_cancels_when_the_target_index_no_longer_exists);
+  RUN(a_gesture_on_empty_space_survives_set_targets_and_can_swipe);
+  RUN(pressed_reports_the_live_target_only);
   RUN(sequential_taps_each_work);
   FINISH();
 }

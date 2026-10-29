@@ -27,8 +27,15 @@ typedef struct {
   int swipe;       // SWIPE_LEFT, SWIPE_RIGHT or 0
 } TouchResult;
 
+// A hit rect plus the identity of what it stands for. A gesture survives a
+// target-set refresh only if its target keeps the same rect and key.
 typedef struct {
-  Rect rects[TOUCH_MAX_RECTS];
+  Rect rect;
+  int16_t key;
+} TouchTarget;
+
+typedef struct {
+  TouchTarget targets[TOUCH_MAX_RECTS];
   int count;
   bool active;
   int target;
@@ -38,7 +45,11 @@ typedef struct {
 } TouchFsm;
 
 void touch_fsm_init(TouchFsm *f);
-void touch_fsm_set_rects(TouchFsm *f, const Rect *rects, int count);
+// Replaces the targets. An active gesture is kept if it has no target or its
+// target index still exists with an equal rect and key; otherwise it is dropped.
+void touch_fsm_set_targets(TouchFsm *f, const TouchTarget *targets, int count);
+// Target index while a gesture is live (not cancelled, long-fired or swiped), else -1.
+int touch_fsm_pressed(const TouchFsm *f);
 TouchResult touch_fsm_down(TouchFsm *f, int x, int y, uint32_t now_ms);
 TouchResult touch_fsm_move(TouchFsm *f, int x, int y, uint32_t now_ms);
 TouchResult touch_fsm_up(TouchFsm *f, int x, int y, uint32_t now_ms);

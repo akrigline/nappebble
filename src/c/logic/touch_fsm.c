@@ -8,7 +8,7 @@ static TouchResult none(void) {
 
 static int hit(const TouchFsm *f, int x, int y) {
   for (int i = 0; i < f->count; i++) {
-    if (rect_contains(f->rects[i], x, y)) return i;
+    if (rect_contains(f->targets[i].rect, x, y)) return i;
   }
   return -1;
 }
@@ -22,12 +22,29 @@ void touch_fsm_init(TouchFsm *f) {
   f->target = -1;
 }
 
-void touch_fsm_set_rects(TouchFsm *f, const Rect *rects, int count) {
+static bool same_rect(Rect a, Rect b) {
+  return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
+}
+
+void touch_fsm_set_targets(TouchFsm *f, const TouchTarget *targets, int count) {
   if (count > TOUCH_MAX_RECTS) count = TOUCH_MAX_RECTS;
-  memcpy(f->rects, rects, sizeof(Rect) * (size_t)count);
+  if (count < 0) count = 0;
+  bool keep = f->active &&
+              (f->target < 0 ||
+               (f->target < count && f->target < f->count &&
+                same_rect(f->targets[f->target].rect, targets[f->target].rect) &&
+                f->targets[f->target].key == targets[f->target].key));
+  if (count > 0) memcpy(f->targets, targets, sizeof(TouchTarget) * (size_t)count);
   f->count = count;
-  f->active = false;
-  f->target = -1;
+  if (!keep) {
+    f->active = false;
+    f->target = -1;
+  }
+}
+
+int touch_fsm_pressed(const TouchFsm *f) {
+  if (f->active && f->target >= 0 && !f->cancelled && !f->long_fired && !f->swiped) return f->target;
+  return -1;
 }
 
 TouchResult touch_fsm_down(TouchFsm *f, int x, int y, uint32_t now_ms) {
@@ -61,7 +78,7 @@ TouchResult touch_fsm_move(TouchFsm *f, int x, int y, uint32_t now_ms) {
     return r;
   }
 
-  if (f->target >= 0 && !f->cancelled && !rect_contains(f->rects[f->target], x, y)) {
+  if (f->target >= 0 && !f->cancelled && !rect_contains(f->targets[f->target].rect, x, y)) {
     r.cancel = f->target;
     f->cancelled = true;
   }
@@ -74,7 +91,7 @@ TouchResult touch_fsm_up(TouchFsm *f, int x, int y, uint32_t now_ms) {
   if (!f->active) return r;
   f->active = false;
   if (f->target >= 0 && !f->cancelled && !f->long_fired && !f->swiped &&
-      rect_contains(f->rects[f->target], x, y)) {
+      rect_contains(f->targets[f->target].rect, x, y)) {
     r.activate = f->target;
   }
   return r;

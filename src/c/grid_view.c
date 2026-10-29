@@ -255,15 +255,17 @@ GridCell *grid_view_add(GridView *gv, CellKind kind, Rect rect, const char *titl
 }
 
 void grid_view_commit(GridView *gv) {
-  Rect rects[TOUCH_MAX_RECTS];
+  TouchTarget targets[TOUCH_MAX_RECTS];
   int n = 0;
   for (int i = 0; i < gv->count && n < TOUCH_MAX_RECTS; i++) {
     // Disabled and text cells get an empty rect so indices stay aligned.
     Rect r = gv->cells[i].rect;
     if (!focusable(&gv->cells[i])) r.w = r.h = 0;
-    rects[n++] = r;
+    targets[n].rect = r;
+    targets[n].key = 0;
+    n++;
   }
-  touch_fsm_set_rects(&gv->fsm, rects, n);
+  touch_fsm_set_targets(&gv->fsm, targets, n);
   if (gv->focus >= gv->count) gv->focus = gv->count - 1;
   redraw(gv);
 }
