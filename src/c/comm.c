@@ -25,6 +25,11 @@ static int s_cmd_id;
 static ReadyGate s_gate;
 static AppTimer *s_ready_timer;
 
+// The phone-app link as last reported by the connection service. Taken from
+// the callback argument, not a fresh peek, which might still read "connected"
+// inside the disconnect handler and leave a queued command waiting for nothing.
+static bool s_connected;
+
 const WatchState *comm_state(void) {
   return &s_state;
 }
@@ -243,7 +248,7 @@ static void out_try(void) {
     // Not ready: hold it (no retry consumed) until the phone speaks or the
     // fallback fires. With no phone at all neither will happen, so give up
     // rather than leave the UI waiting; out_give_up moves on to the rest.
-    if (!connection_service_peek_pebble_app_connection()) out_give_up(COMM_ACK_NOT_SENT);
+    if (!s_connected) out_give_up(COMM_ACK_NOT_SENT);
     return;
   }
   DictionaryIterator *it;
@@ -308,6 +313,7 @@ static void ready_arm(void) {
 // PebbleKit JS starts a fresh context on reconnect, so readiness is per connection.
 static void on_phone_connection(bool connected) {
   bool was_not_responding = rg_not_responding(&s_gate);
+  s_connected = connected;
   rg_on_connection(&s_gate, connected);
   if (connected) ready_arm();
   else ready_timer_cancel();
@@ -318,7 +324,7 @@ static void on_phone_connection(bool connected) {
 }
 
 bool comm_send(int cmd, int32_t a1, int32_t a2, int32_t a3, int32_t a4) {
-  if (!connection_service_peek_pebble_app_connection()) return false;
+  if (!s_connected) return false;
   if (s_out_count >= OUT_QUEUE) return false;
   s_cmd_id++;
   OutCmd *c = &s_out[s_out_count++];
@@ -346,8 +352,9 @@ void comm_init(void) {
   app_message_register_outbox_failed(outbox_failed);
   app_message_open(INBOX_SIZE, OUTBOX_SIZE);
   rg_init(&s_gate);
+  s_connected = connection_service_peek_pebble_app_connection();
   connection_service_subscribe((ConnectionHandlers){ .pebble_app_connection_handler = on_phone_connection });
-  if (connection_service_peek_pebble_app_connection()) ready_arm();
+  if (s_connected) ready_arm();
 }
 
 void comm_deinit(void) {
