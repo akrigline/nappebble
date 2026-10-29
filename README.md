@@ -35,10 +35,19 @@ Units are two settings, `bottleUnits` and `pumpUnits` (`oz` or `ml`), e.g. `"bot
 ## Gotchas
 
 - pkjs is bundled by webpack 1: stay within ES2015 syntax (no trailing commas in calls, no object spread, no async/await). `test/syntax.test.js` is a tripwire; `pebble build` is the authority.
-- After changing `messageKeys` in `package.json`, run `pebble clean` or the generated `MESSAGE_KEY_*` header goes stale.
+- After changing `messageKeys` in `package.json`, run `pebble clean` or the generated `MESSAGE_KEY_*` header goes stale. This includes `JS_READY`, the key the phone sends first on every start to tell the watch PebbleKit JS is up; it lives in both `src/pkjs/protocol.js` (`MESSAGE_KEYS`) and `package.json` `messageKeys`, and the protocol sync test checks that they agree. The watch treats any message from the phone as ready, so `JS_READY` itself is never read by name in C.
 - Clay builds its widgets from the config passed to its constructor, so `index.js` makes a new Clay per settings page.
 - The docs give no error code for 429 or 404; the client branches on HTTP status for 429.
 - The emulator's XHR reports a refused connection only through `readystatechange`; `xhr-transport.js` copes and has a watchdog.
+
+## Behaviour to know
+
+- **Touch turned off.** If touch is disabled in the watch's Settings, the app does not use it: the button focus ring shows at once and a one-time notice, "Touch is off. Using buttons.", appears. The notice blocks the buttons for about 2.5 seconds.
+- **The first touch after the watch idles is ignored, on purpose.** The system flags that touch as non-navigational and the app does not act on it. Acting on it could log something by accident, and there is no delete in the nappi API. Touch again.
+- **No swipe to switch nursing side.** The original spec had a swipe on the running nursing timer; it was dropped on purpose. Switching side stops one entry and starts another, a stray swipe cannot be undone, so only the "Switch side" button does it. Swiping between Home pages still works.
+- **"Logged" means the phone has the entry, not that nappi has it yet.** If there is no answer the watch says "Not confirmed. Check nappi" rather than guessing, and asks the phone for a fresh state. With "exit after log" on, the app stays open and says "Saved on your phone. Will send later" if the phone has not delivered in time.
+- **Elapsed times on Home are in whole minutes** and may lag by up to a minute.
+- **The API address must be `https://`.** Plain `http://` is accepted only for localhost and private network addresses (for testing against a dev machine); otherwise the value is ignored.
 
 ## License
 
