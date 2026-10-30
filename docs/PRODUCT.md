@@ -237,6 +237,12 @@ The app is independent and is not made by or affiliated with nappi.
 +------------+-------------+  y=224..228 page dots
 ```
 
+Real screens, from the emulator against the mock API (the emulator has no touch, so a focus ring shows):
+
+| Home, page 1 | Home, page 2 | Diaper | Bottle | Nursing timer |
+|---|---|---|---|---|
+| ![Home grid, page 1](screenshots/emery_1_home.png) | ![Home grid, page 2](screenshots/emery_2_page2.png) | ![Diaper sheet](screenshots/emery_3_diaper.png) | ![Bottle sheet](screenshots/emery_4_bottle.png) | ![Nursing timer screen](screenshots/emery_5_timer.png) |
+
 Sheets (Diaper, Potty, Bottle, Nursing start, Sleep/Pump start, Pump "How much?"): header "<baby>: <title>", then the time strip, then (Bottle and Pump) the unit pair and amount strip, then the action buttons. Switch baby is a list of baby buttons. Status is a text block and Refresh.
 
 ## 6. Out of scope and removed

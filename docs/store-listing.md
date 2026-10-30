@@ -63,7 +63,7 @@ First release (early version). Log diapers, bottles, potty, and sleep, nursing a
 | Small icon | 80x80 | `store/icon-small.png` | Done |
 | Large icon | 144x144 | `store/icon-large.png` | Done |
 | Menu icon (in the .pbw) | 25x25 | `resources/icons/menu-icon.png` | Done |
-| Screenshots | 200x228 each, up to 5, no frame | none yet (see the checklist below) | Not taken |
+| Screenshots | 200x228 each, up to 5, no frame | `docs/screenshots/emery_1_home.png`, `emery_2_page2.png`, `emery_3_diaper.png`, `emery_4_bottle.png`, `emery_5_timer.png` | Taken (emulator, mock API; some show the button-fallback focus ring) |
 | Banner | 720x320, optional | none | Skipped |
 
 The store icons and the menu icon are made from nappi's own logo (`art/nappi-logo.png`; `node tools/make-store-assets.js` and `node tools/make-icons.js`). That is nappi's artwork, so get nappi's agreement to use it before a public listing, and note it sits oddly beside the "not affiliated" line above: if you do have their blessing, reword that line to say so.
@@ -72,6 +72,6 @@ The store icons and the menu icon are made from nappi's own logo (`art/nappi-log
 
 1. Publish as Unlisted first and switch to Listed after a few more days of use by people other than the author.
 2. Settle the affiliation line above and the icon question.
-3. Take the screenshots (page 1, page 2, a logging sheet) against the mock server. Filenames must start with the platform, for example `emery_1_home.png`.
+3. Screenshots are in `docs/screenshots/` (page 1, page 2, Diaper, Bottle, nursing timer; filenames start with the platform as the store requires). Retake them with `pebble screenshot --emulator emery` against the mock server if the UI changes. They show nappi's tile icons, so they fall under the icon question in step 2.
 4. `pebble login`, then `pebble publish`. It reads the version and UUID from `package.json`, asks for the rest, and creates the listing.
 5. Later releases: bump `version` in `package.json`, `pebble build`, `pebble publish --release-notes "..."`.

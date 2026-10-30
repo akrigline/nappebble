@@ -57,7 +57,7 @@ src/c/logic/     plain C, no SDK includes, host-tested: model fmt layout touch_f
 test/            *.test.js (node:test); c/ (host C tests + Makefile); support/ (mock nappi, engine harness, dev server)
 resources/icons  1-bit tile icons and the menu icon;  art/ their SVG sources and nappi's logo
 store/           appstore icons;  tools/ scripts that render icons and store assets
-docs/            ARCHITECTURE.md, PRODUCT.md, store-listing.md
+docs/            ARCHITECTURE.md, PRODUCT.md, store-listing.md; screenshots/ (emulator captures used by the README, PRODUCT.md and the store)
 .claude/skills/   vendored third-party skill: pebble-watchface
 package.json     the app manifest too: uuid, targetPlatforms, messageKeys, resources
 ```

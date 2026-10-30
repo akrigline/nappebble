@@ -4,6 +4,16 @@ Log your baby's feeds, diapers, potty, sleep and pumping to [nappi](https://napp
 
 It is a C watch app (Emery, touch) plus PebbleKit JS on the phone, which holds your API token and talks to `api.nappi.app`. Entries queue on the phone when it is offline and send when it reconnects. nappebble is an independent app and is not made by or affiliated with nappi.
 
+<p>
+  <img src="docs/screenshots/emery_1_home.png" width="200" alt="Home grid: Sleep, Nursing, Bottle and Diaper tiles, each showing how long ago it last happened">
+  <img src="docs/screenshots/emery_2_page2.png" width="200" alt="Second page of the grid: Pump, Potty and Status tiles">
+  <img src="docs/screenshots/emery_3_diaper.png" width="200" alt="Diaper sheet: time slider and Wet, Poo, Mixed and Dry buttons">
+  <img src="docs/screenshots/emery_4_bottle.png" width="200" alt="Bottle sheet: time slider, oz/ml, amount slider, Formula and Breast milk buttons">
+  <img src="docs/screenshots/emery_5_timer.png" width="200" alt="Nursing timer screen: running clock, Switch side and Stop buttons">
+</p>
+
+Home grid, second page, Diaper, Bottle and the nursing timer, from the Emery emulator against the mock API (`docs/screenshots/`). The emulator has no touch, so the focus ring you see on some screens is the button fallback.
+
 **You need** a Pebble Time 2, the Pebble phone app, a nappi account with Premium, and an API token from nappi (see [nappi's API docs](https://nappi.app/app/api/reference)). Paste the token into nappebble's settings in the phone app, then pick your baby.
 
 ## Documentation
@@ -29,4 +39,4 @@ Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` 
 
 ## License
 
-MIT, see `LICENSE`. The tile icons in `art/icons/` and the logo in `art/nappi-logo.png` (with the menu and store icons built from it) are nappi's artwork, not ours, and the MIT license does not cover them.
+MIT, see `LICENSE`. The tile icons in `art/icons/` and the logo in `art/nappi-logo.png` (with the menu and store icons built from it) are nappi's artwork, not ours, and the MIT license does not cover them. The screenshots in `docs/screenshots/` show those icons, so the same applies to them.
