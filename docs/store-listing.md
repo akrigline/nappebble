@@ -62,9 +62,9 @@ First release (early version). Log diapers, bottles, potty, and sleep, nursing a
 | Large icon | 144x144 | `store/icon-large.png` | Done |
 | Menu icon (in the .pbw) | 25x25 | `resources/icons/menu-icon.png` | Done |
 | Screenshots | 200x228 each, up to 5, no frame | `docs/screenshots/emery_1_home.png`, `emery_2_page2.png`, `emery_3_diaper.png`, `emery_4_bottle.png`, `emery_5_timer.png` | Taken (emulator, mock API; some show the button-fallback focus ring) |
-| Banner | 720x320, optional | `store/banner.png` (`node tools/make-banner.js`) | Done. Carries nappi's "Works with nappi" badge, unedited. The badge terms name README, website and store screenshots, not banners: get nappi's OK first, or drop the badge from the banner. |
+| Banner | 720x320, optional | `store/banner.png` (`node tools/make-banner.js`) | Done. Carries nappi's "Works with nappi" badge, unedited. |
 
-The store icons and the menu icon are nappebble's own (`art/nappebble-icon.svg`: a sleepy watch cradled in a crescent moon, line art; `node tools/make-store-assets.js` and `node tools/make-icons.js`). The layout deliberately echoes nappi's mark, so confirm with nappi's developer that it is acceptable before a public listing (their badge terms bar anything that looks like their logo as an app or store icon). nappebble does not use nappi's logo itself. The tile icons in the screenshots are nappi's, used with its developer's agreement and treated as MIT.
+The store icons and the menu icon are nappebble's own (`art/nappebble-icon.svg`: a sleepy watch cradled in a crescent moon, line art; `node tools/make-store-assets.js` and `node tools/make-icons.js`). The tile icons in the screenshots are nappi's, used with its developer's agreement and treated as MIT.
 
 ## Before publishing
 
