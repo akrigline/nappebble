@@ -1,5 +1,5 @@
 // Renders art/icons/*.svg (24px line icons from the nappi app) to 1-bit PNGs in resources/icons/,
-// and the launcher menu icon from art/nappi-logo.png.
+// and the launcher menu icon (a 1-bit rendering of art/nappebble-icon.svg).
 // Needs: npm i --no-save @resvg/resvg-js pngjs
 const fs = require('fs');
 const path = require('path');
@@ -9,8 +9,8 @@ const { PNG } = require('pngjs');
 const SRC = path.join(__dirname, '..', 'art', 'icons');
 const OUT = path.join(__dirname, '..', 'resources', 'icons');
 const SIZE = 24;
-const MENU_SIZE = 25;   // the launcher's menu icon, a 1-bit silhouette of art/nappi-logo.png
-const MENU_CUTOFF = 60; // luminance at or above this is ink; lower keeps the gap between moon and baby open
+const MENU_SIZE = 25;   // the launcher's menu icon
+const MENU_COVERAGE = 0.35; // share of a cell the line art must cover to count as ink
 
 function render(file, size, outName) {
   const svg = fs.readFileSync(path.join(SRC, file));
@@ -30,15 +30,25 @@ for (const file of fs.readdirSync(SRC).filter((f) => f.endsWith('.svg'))) {
   render(file, SIZE, file.replace('.svg', '.png'));
 }
 
-// The logo is light shapes on black: shrink it, then keep the bright pixels as ink.
-const logo = fs.readFileSync(path.join(__dirname, '..', 'art', 'nappi-logo.png')).toString('base64');
-const wrapped = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><image href="data:image/png;base64,' +
-  logo + '" width="512" height="512"/></svg>';
-const small = PNG.sync.read(new Resvg(wrapped, { fitTo: { mode: 'width', value: MENU_SIZE } }).render().asPng());
+// The app icon's line art (art/nappebble-icon.svg) without its background or face: render big, then keep a
+// 25 px cell as ink when enough of it is covered. Thin 1 px lines survive this better than a plain downscale.
+const FACTOR = 8;
+const iconSvg = fs.readFileSync(path.join(__dirname, '..', 'art', 'nappebble-icon.svg'), 'utf8')
+  .replace(/<rect id="background"[^>]*\/>/, '')
+  .replace(/<path id="face"[^>]*\/>/, ''); // the face turns to mush at 25 px
+const big = PNG.sync.read(new Resvg(iconSvg, { fitTo: { mode: 'width', value: MENU_SIZE * FACTOR } }).render().asPng());
 const menu = new PNG({ width: MENU_SIZE, height: MENU_SIZE });
-for (let i = 0; i < MENU_SIZE * MENU_SIZE; i++) {
-  const lum = 0.299 * small.data[i * 4] + 0.587 * small.data[i * 4 + 1] + 0.114 * small.data[i * 4 + 2];
-  menu.data.set(lum >= MENU_CUTOFF ? [0, 0, 0, 255] : [0, 0, 0, 0], i * 4);
+for (let y = 0; y < MENU_SIZE; y++) {
+  for (let x = 0; x < MENU_SIZE; x++) {
+    let covered = 0;
+    for (let dy = 0; dy < FACTOR; dy++) {
+      for (let dx = 0; dx < FACTOR; dx++) {
+        covered += big.data[(((y * FACTOR + dy) * MENU_SIZE * FACTOR) + x * FACTOR + dx) * 4 + 3];
+      }
+    }
+    const on = covered / (FACTOR * FACTOR * 255) >= MENU_COVERAGE;
+    menu.data.set(on ? [0, 0, 0, 255] : [0, 0, 0, 0], (y * MENU_SIZE + x) * 4);
+  }
 }
 fs.writeFileSync(path.join(OUT, 'menu-icon.png'), PNG.sync.write(menu));
 console.log('wrote menu-icon.png');

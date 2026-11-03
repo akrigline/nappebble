@@ -2,7 +2,12 @@
 
 Log your baby's feeds, diapers, potty, sleep and pumping to [nappi](https://nappi.app) from a Pebble Time 2. Open the app, tap a big colour tile, done: most things take two taps.
 
-It is a C watch app (Emery, touch) plus PebbleKit JS on the phone, which holds your API token and talks to `api.nappi.app`. Entries queue on the phone when it is offline and send when it reconnects. nappebble is an independent app and is not made by or affiliated with nappi.
+It is a C watch app (Emery, touch) plus PebbleKit JS on the phone, which holds your API token and talks to `api.nappi.app`. Entries queue on the phone when it is offline and send when it reconnects. nappebble is an independent project by its developer. It is not made or supported by nappi.
+
+<a href="https://nappi.app"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="art/badge/works-with-nappi-dark.svg">
+  <img src="art/badge/works-with-nappi-light.svg" width="226" height="56" alt="Works with nappi">
+</picture></a>
 
 <p>
   <img src="docs/screenshots/emery_1_home.png" width="200" alt="Home grid: Sleep, Nursing, Bottle and Diaper tiles, each showing how long ago it last happened">
@@ -39,4 +44,4 @@ Mock tokens: `dev-token` (good), `expired-token`, `revoked-token`, `free-token` 
 
 ## License
 
-MIT, see `LICENSE`. The tile icons in `art/icons/` and the logo in `art/nappi-logo.png` (with the menu and store icons built from it) are nappi's artwork, not ours, and the MIT license does not cover them. The screenshots in `docs/screenshots/` show those icons, so the same applies to them.
+MIT, see `LICENSE`. That covers everything in the repo, including the tile icons in `art/icons/` (nappi's developer agreed they may be used and treated as MIT) and the screenshots. nappebble is an independent project and does not use nappi's logo; the app icon in `art/nappebble-icon.svg` is its own. The one exception is the "Works with nappi" badge in `art/badge/`, which is nappi's, used unedited under the terms at <https://nappi.app/press#works-with>; the MIT license does not cover it.

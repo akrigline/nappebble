@@ -38,7 +38,7 @@ nappebble logs a baby's feeds, diapers, potty visits, sleep and pumping to [napp
 | API token | Created in nappi (see [nappi's API docs](https://nappi.app/app/api/reference)) and pasted into the app's settings. A dedicated token for the watch is recommended, because rate limits are per token. |
 | Network | The phone needs internet to deliver entries. The watch itself needs none. |
 
-The app is independent and is not made by or affiliated with nappi.
+The app is an independent project by its developer, not made or supported by nappi.
 
 ## 3. Feature index
 
@@ -268,5 +268,4 @@ Sheets (Diaper, Potty, Bottle, Nursing start, Sleep/Pump start, Pump "How much?"
 | Gabbro (Pebble Round 2) port | Not started |
 | Which store to publish to (Rebble or the Core Devices app store) | Open |
 | Does nappi's own timer notification mirror to the watch? | Open |
-| Affiliation wording and permission to use nappi's artwork in the store listing | Open; see store-listing.md |
 | Strip adjustment by repeating button clicks | Planned |

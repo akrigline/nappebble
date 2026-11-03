@@ -8,3 +8,4 @@ node_modules/
 test/c/build/
 .superpowers/
 docs/superpowers/
+.lavish/

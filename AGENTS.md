@@ -55,8 +55,8 @@ src/c/           watch UI and SDK glue: main.c comm.c grid_view.c ui.c home.c sh
 src/c/logic/     plain C, no SDK includes, host-tested: model fmt layout touch_fsm lockout strip amount nav
                  send_flow ready_gate, and protocol.h (mirror of protocol.js)
 test/            *.test.js (node:test); c/ (host C tests + Makefile); support/ (mock nappi, engine harness, dev server)
-resources/icons  1-bit tile icons and the menu icon;  art/ their SVG sources and nappi's logo
-store/           appstore icons;  tools/ scripts that render icons and store assets
+resources/icons  1-bit tile icons and the menu icon;  art/ their SVG sources and the app icon
+store/           appstore icons and banner;  tools/ scripts that render icons and store assets
 docs/            ARCHITECTURE.md, PRODUCT.md, store-listing.md; screenshots/ (emulator captures used by the README, PRODUCT.md and the store)
 .claude/skills/   vendored third-party skill: pebble-watchface
 package.json     the app manifest too: uuid, targetPlatforms, messageKeys, resources
@@ -95,8 +95,8 @@ These are the short version. ARCHITECTURE.md section 9 has the full list and the
 - Clay builds its widgets from the config passed to its constructor, so `index.js` creates a new Clay per settings page.
 - The first touch after the watch idles (`non_navigational`) is ignored on purpose.
 - An interrupted `pebble sdk install` can leave a partial SDK directory that the tool still reports as installed (builds fail with a `NODE_PATH` error). Fix: `pebble sdk uninstall 4.33.1` then `pebble sdk install 4.33.1`.
-- Tile icons in `art/icons/*.svg` are rendered to 1-bit PNGs by `node tools/make-icons.js` (after `npm i --no-save @resvg/resvg-js pngjs`); `grid_view.c` recolours them. Store icons come from `art/nappi-logo.png` via `tools/make-store-assets.js`.
-- The tile icons, the logo, and icons derived from them are nappi's artwork. The MIT license does not cover them; do not relicense or redistribute them elsewhere.
+- Tile icons in `art/icons/*.svg` are rendered to 1-bit PNGs by `node tools/make-icons.js` (after `npm i --no-save @resvg/resvg-js pngjs`); `grid_view.c` recolours them. The menu icon is drawn in that script too. Store icons come from `art/nappebble-icon.svg` via `tools/make-store-assets.js`.
+- nappebble is independent of nappi. Do not use nappi's logo or branding in the app or as an icon. The only nappi mark allowed is the "Works with nappi" badge in `art/badge/` (README, website and store screenshots only), and it must stay unedited with the independence line next to it: <https://nappi.app/press#works-with>. The tile icons in `art/icons/` came from nappi with its developer's agreement to treat them as MIT.
 
 ## Doing the work
 

@@ -7,6 +7,11 @@
     "pebble-app"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/akrigline/nappebble",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akrigline/nappebble.git"
+  },
   "private": true,
   "scripts": {
     "test": "npm run test:js && npm run test:c",
