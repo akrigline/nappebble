@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Current. Matches the code at v0.1.0, which is in daily use on a Time 2 with the real nappi API. |
-| Last reviewed | 2026-10-29 |
+| Last reviewed | 2026-11-03 |
 | Audience | Anyone changing the code: engineers and agents |
 | Read with | [PRODUCT.md](PRODUCT.md) (what the app does), [../AGENTS.md](../AGENTS.md) (how to work in the repo), [store-listing.md](store-listing.md) (release checklist) |
 
@@ -69,7 +69,7 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 - A Stop names no timer (no id, no `started_at` precondition, no idempotency key): it stops whatever timer of that type is running. A timer's `started_at` is the only identity it has (ADR-021).
 - Times must be ISO 8601 with an offset. Amounts are millilitres unless `unit: "oz"` is sent; latest-entry responses always report ml. Nursing `side: both` is valid only when starting a timer. A logged nursing entry needs durations, so live nursing goes through timers.
 - Error bodies are `{"error": {"code", "message"}}`. Codes the docs name: `unauthorized`, `token_expired`, `premium_required`, `timer_not_running`. The docs give no code for 429 or 404, so the client branches on HTTP status.
-- Calls the app makes: `GET /v1/babies`, `GET /v1/babies/{id}/entries/latest?types=...`, `GET /v1/babies/{id}/timers`, `POST /v1/babies/{id}/entries`, `POST /v1/babies/{id}/timers/{sleep|nursing|pumping}/start|stop`.
+- Calls the app makes: `GET /v1/babies`, `GET /v1/babies/{id}/status?types=...` (active baby), `GET /v1/babies/{id}/timers` (other babies, and the Stop check in ADR-021), `POST /v1/babies/{id}/entries`, `POST /v1/babies/{id}/timers/{sleep|nursing|pumping}/start|stop`.
 - The assumptions the mock had to make because the docs are silent are listed at the top of `test/support/mock-nappi.js`. Real-API behaviour that contradicts one of them is a bug in the mock first.
 
 ### 3.2 Pebble platform
@@ -132,7 +132,7 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 
 1. Watch `init`: `ui_init`, `comm_init` (loads the persisted `WatchState`, marks it `from_cache`), pushes Home. It sends nothing.
 2. Phone `ready` event runs `app.start()`: sends `JS_READY`, then (with a token and a cached baby list) the cached state, then a forced refresh.
-3. A refresh flushes the write queue, then reads `entries/latest` (with `If-None-Match`) and `timers` for the active baby, plus `timers` for each other baby, then sends `STATE`. The first `STATE` clears `from_cache`.
+3. A refresh flushes the write queue, then reads `/status` for the active baby (running timers and latest entries in one read, no ETag; ADR-020), plus `timers` for each other baby, then sends `STATE`. The first `STATE` clears `from_cache`.
 
 ### 5.2 Logging an entry (the critical path)
 
