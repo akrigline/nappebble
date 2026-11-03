@@ -347,6 +347,21 @@ function createMockNappi(options) {
     return respond(200, { status: 'stopped', entry: out });
   }
 
+  function timersOf(baby) {
+    const d = data.get(baby.id);
+    return TIMER_TYPES.filter((t) => d.timers[t]).map((t) => timerJson(t, d.timers[t]));
+  }
+
+  function latestPayload(baby, url) {
+    let types = TYPES;
+    const asked = url.searchParams.get('types');
+    if (asked !== null) {
+      types = asked.split(',').map((s) => s.trim()).filter(Boolean);
+      types.forEach((t) => oneOf(t, TYPES, 'types'));
+    }
+    return Object.fromEntries(types.map((t) => [t, latestOf(baby, t)]));
+  }
+
   // ---- routing ----
 
   const BABY = '\\/v1\\/babies\\/([^/]+)';
@@ -354,15 +369,12 @@ function createMockNappi(options) {
     { method: 'GET', pattern: /^\/v1\/babies$/, kind: 'read', run: () => respond(200, babies) },
     {
       method: 'GET', pattern: new RegExp('^' + BABY + '\\/entries\\/latest$'), kind: 'read',
-      run: (req, url, baby) => {
-        let types = TYPES;
-        const asked = url.searchParams.get('types');
-        if (asked !== null) {
-          types = asked.split(',').map((s) => s.trim()).filter(Boolean);
-          types.forEach((t) => oneOf(t, TYPES, 'types'));
-        }
-        return withEtag(req, Object.fromEntries(types.map((t) => [t, latestOf(baby, t)])));
-      },
+      run: (req, url, baby) => withEtag(req, latestPayload(baby, url)),
+    },
+    {
+      // Not in the 2026-10 snapshot of the spec; the live spec has it. Same data as /timers and /entries/latest.
+      method: 'GET', pattern: new RegExp('^' + BABY + '\\/status$'), kind: 'read',
+      run: (req, url, baby) => withEtag(req, { timers: timersOf(baby), latest: latestPayload(baby, url) }),
     },
     {
       method: 'GET', pattern: new RegExp('^' + BABY + '\\/entries\\/latest\\/([^/]+)$'), kind: 'read',
@@ -385,10 +397,7 @@ function createMockNappi(options) {
     },
     {
       method: 'GET', pattern: new RegExp('^' + BABY + '\\/timers$'), kind: 'read',
-      run: (req, url, baby) => {
-        const d = data.get(baby.id);
-        return respond(200, TIMER_TYPES.filter((t) => d.timers[t]).map((t) => timerJson(t, d.timers[t])));
-      },
+      run: (req, url, baby) => respond(200, timersOf(baby)),
     },
     {
       method: 'POST', pattern: new RegExp('^' + BABY + '\\/timers\\/([^/]+)\\/(start|stop)$'), kind: 'write',

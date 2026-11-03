@@ -131,7 +131,9 @@ test('an appmessage from the watch becomes an acknowledged, delivered write', as
   const b = boot();
   b.fire('ready', {});
   await b.settle();
-  b.fire('appmessage', { payload: { CMD: P.CMD.LOG_DIAPER, CMD_ID: 5, ARG1: P.DIAPER.WET, ARG2: 0 } });
+  const shown = b.sent.find((d) => 'STATUS' in d);
+  assert.ok(shown.BABY_KEY, 'the state names the baby');
+  b.fire('appmessage', { payload: { CMD: P.CMD.LOG_DIAPER, CMD_ID: 5, ARG1: P.DIAPER.WET, ARG2: 0, BABY_KEY: shown.BABY_KEY } });
   await b.settle();
   assert.ok(b.sent.some((d) => d.ACK_ID === 5 && d.ACK_STATUS === P.STATUS.OK));
   const post = b.requests.find((r) => r.method === 'POST');

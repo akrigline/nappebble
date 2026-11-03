@@ -31,10 +31,11 @@ test('start without a token still sends JS_READY first', async () => {
   assert.equal(h.toWatch[1].STATUS, P.STATUS.NO_TOKEN);
 });
 
-test('a first start reads babies, latest and timers, and sends the full state', async () => {
+test('a first start reads babies and status, and sends the full state', async () => {
   const h = harness();
   await h.app.start();
-  assert.equal(h.reads().length, 3);
+  assert.equal(h.reads().length, 2);
+  assert.ok(h.reads()[1].url.endsWith('/status?types=sleep,nursing,bottle,diaper,potty,pumping'));
   const s = h.state();
   assert.equal(s.STATUS, P.STATUS.OK);
   assert.equal(s.BABY_NAME, 'Phoebe');
@@ -43,21 +44,21 @@ test('a first start reads babies, latest and timers, and sends the full state', 
   assert.equal(h.settings.get().babyId, PHOEBE.id);
 });
 
-test('the latest request asks only for the types the tiles need', async () => {
+test('the status request asks only for the types the tiles need', async () => {
   const h = harness();
   await h.app.start();
-  const latest = h.reads().find((r) => r.url.includes('/entries/latest'));
-  const types = new URL(latest.url).searchParams.get('types').split(',').sort();
+  const status = h.reads().find((r) => r.url.includes('/status'));
+  const types = new URL(status.url).searchParams.get('types').split(',').sort();
   assert.deepEqual(types, ['bottle', 'diaper', 'nursing', 'potty', 'pumping', 'sleep']);
 });
 
-test('a second start uses the cached babies, so launch costs two reads', async () => {
+test('a second start uses the cached babies, so launch costs one read', async () => {
   const h = harness();
   await h.app.start();
   h.reset();
   h.clock.t += 2 * MIN;
   await h.app.start();
-  assert.equal(h.reads().length, 2);
+  assert.equal(h.reads().length, 1);
 });
 
 test('existing entries and running timers show up in the state', async () => {
@@ -143,16 +144,25 @@ test('REFRESH inside a minute is served from cache with no requests', async () =
   assert.equal(h.state().BABY_NAME, 'Phoebe');
 });
 
-test('REFRESH after a minute re-reads with If-None-Match and takes the 304', async () => {
+test('REFRESH after a minute is one status read, sent without an ETag', async () => {
   const h = harness();
   h.api(`${BABY_PATH(PHOEBE)}/entries`, { type: 'diaper', diaper_type: 'wet', time: '2026-10-24T17:00:00Z' });
   await h.app.start();
   h.reset();
   h.clock.t += 61 * 1000;
   await h.app.onMessage({ CMD: P.CMD.REFRESH });
-  const latest = h.reads().find((r) => r.url.includes('/entries/latest'));
-  assert.ok(latest.headers['If-None-Match']);
-  assert.equal(h.state().INFO[P.ACTION.DIAPER], P.DIAPER.WET + 1, 'cached data survives a 304');
+  assert.equal(h.reads().length, 1);
+  assert.ok(h.reads()[0].url.includes('/status'));
+  assert.equal(h.reads()[0].headers['If-None-Match'], undefined);
+  assert.equal(h.state().INFO[P.ACTION.DIAPER], P.DIAPER.WET + 1);
+});
+
+test('latest entries and running timers come from the same status read', async () => {
+  const h = harness();
+  h.api(`${BABY_PATH(PHOEBE)}/timers/sleep/start`, {});
+  await h.app.start();
+  assert.equal(h.reads().filter((r) => r.url.includes('/entries/latest') || r.url.endsWith('/timers')).length, 0);
+  assert.equal(h.state().TIMER_STATE[P.TIMER_TYPES.indexOf('sleep')], P.TIMER_STATE.RUNNING, 'the timer arrived with the entries');
 });
 
 test('a change made elsewhere is picked up on the next refresh', async () => {
@@ -228,7 +238,7 @@ test('after a write there is one debounced re-read; more writes push it back', a
   assert.ok(pending[0].ms >= 3000);
   assert.equal(h.reads().length, 0, 'no reads yet');
   await h.runScheduled();
-  assert.equal(h.reads().length, 2, 'latest + timers once');
+  assert.equal(h.reads().length, 1, 'one status read');
 });
 
 test('offline writes are acknowledged, kept, and delivered once the phone is back online', async () => {
@@ -409,13 +419,13 @@ test('two babies: names are sent and the saved one is active', async () => {
   assert.equal(s.BABY_INDEX, 1);
 });
 
-test('two babies cost three reads per refresh: latest, timers, and the other baby\'s timers', async () => {
+test('two babies cost two reads per refresh: status, and the other baby\'s timers', async () => {
   const h = harness({ babies: [PHOEBE, OSCAR] });
   await h.app.start();
   h.reset();
   h.clock.t += 2 * MIN;
   await h.app.onMessage({ CMD: P.CMD.REFRESH });
-  assert.equal(h.reads().length, 3);
+  assert.equal(h.reads().length, 2);
 });
 
 test('a running timer on the other baby lights the dot', async () => {
@@ -641,4 +651,78 @@ test('a write keeps the unit it was logged in when units change before the queue
   const sent = JSON.parse(flushed[0].body);
   assert.equal(sent.unit, 'oz');
   assert.equal(sent.amount, 4);
+});
+
+// ---------- a Stop must not stop someone else's timer ----------
+
+const STOP_SLEEP = (id) => ({ CMD: P.CMD.TIMER_STOP, CMD_ID: id, ARG1: P.TIMER.SLEEP, ARG2: 0, ARG3: 0 });
+const queued = (h) => JSON.parse(h.storage.data['nappebble.queue']);
+const serverTimers = (h) => JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/timers`).body);
+
+test('a stop is tied to the timer the server reported when it was queued', async () => {
+  const h = harness();
+  h.api(`${BABY_PATH(PHOEBE)}/timers/sleep/start`, {});
+  const startedAt = serverTimers(h)[0].started_at;
+  await h.app.start();
+  h.net.offline = true;
+  await h.app.onMessage(STOP_SLEEP(1));
+  await h.app.idle();
+
+  assert.equal(queued(h)[0].startedAt, startedAt);
+});
+
+test('a stop for a timer this phone only guessed at is not tied to anything', async () => {
+  const h = harness();
+  await h.app.start();
+  h.net.offline = true;
+  await h.app.onMessage({ CMD: P.CMD.TIMER_START, CMD_ID: 1, ARG1: P.TIMER.SLEEP, ARG2: 0, ARG3: 0 });
+  await h.app.onMessage(STOP_SLEEP(2));
+  await h.app.idle();
+
+  const stop = queued(h).find((j) => j.kind === 'timer_stop');
+  assert.equal(stop.startedAt, undefined, 'the guessed start time would never match the server\'s');
+});
+
+test('a stop queued offline does not stop the timer another device started meanwhile', async () => {
+  const h = harness();
+  h.api(`${BABY_PATH(PHOEBE)}/timers/sleep/start`, {});
+  await h.app.start();
+  h.net.offline = true;
+  await h.app.onMessage(STOP_SLEEP(1));
+  await h.app.idle();
+
+  // Meanwhile the household stops that timer and starts another.
+  h.net.offline = false;
+  h.clock.t += 10 * MIN;
+  h.api(`${BABY_PATH(PHOEBE)}/timers/sleep/stop`, {});
+  h.clock.t += 5 * MIN;
+  h.api(`${BABY_PATH(PHOEBE)}/timers/sleep/start`, {});
+  const theirs = serverTimers(h)[0].started_at;
+  h.reset();
+
+  await h.app.onMessage({ CMD: P.CMD.REFRESH, ARG1: 1 });
+  await h.app.idle();
+
+  assert.equal(h.writes().filter((r) => r.url.endsWith('/stop')).length, 0, 'no stop request went out');
+  assert.equal(serverTimers(h)[0].started_at, theirs, 'their timer is still running');
+  assert.equal(h.state().PENDING, 0);
+  assert.equal(h.state().TIMER_STATE[P.TIMER_TYPES.indexOf('sleep')], P.TIMER_STATE.RUNNING, 'the watch shows what is really running');
+  assert.equal(h.acks().filter((a) => a.ACK_STATUS === P.STATUS.REJECTED).length, 0, 'not reported as a rejected log');
+});
+
+test('the check read is counted against the read budget', async () => {
+  const h = harness();
+  h.api(`${BABY_PATH(PHOEBE)}/timers/sleep/start`, {});
+  await h.app.start();                                                                 // 2 reads
+  for (let i = 0; i < 8; i++) await h.app.onMessage({ CMD: P.CMD.REFRESH, ARG1: 1 }); // 10 reads
+  h.net.offline = true;
+  await h.app.onMessage(STOP_SLEEP(1));
+  await h.app.idle();
+  h.net.offline = false;
+  await h.app.onMessage(DIAPER_CMD(2, P.DIAPER.WET));   // flushes the queue: the stop is checked first (11th read)
+  await h.app.idle();
+  assert.equal(h.reads().filter((r) => r.url.endsWith('/timers')).length, 1, 'the stop was checked');
+  h.reset();
+  await h.runScheduled();
+  assert.equal(h.reads().length, 0, 'one read left is not enough for the re-read, so the check was counted');
 });

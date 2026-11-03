@@ -5,6 +5,7 @@
 //         othersRunning, settings, pending, now }
 
 const P = require('./protocol');
+const { babyKey } = require('./babies');
 
 const ACCENTS = 6;
 const OZ_ML = 29.5735;
@@ -83,6 +84,7 @@ function buildState(view) {
   state.BABY_NAME = baby.name;
   state.BABY_COUNT = view.babies.length;
   state.BABY_INDEX = view.activeIndex;
+  state.BABY_KEY = babyKey(baby.id);
   state.BABY_NAMES = view.babies.map((b) => b.name).join('\n');
   state.BABY_ACCENT = view.activeIndex % ACCENTS;
   state.OTHER_TIMERS = view.othersRunning ? 1 : 0;

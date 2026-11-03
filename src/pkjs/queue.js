@@ -3,9 +3,16 @@
 // out strictly in order: the first one that cannot be delivered holds the
 // rest back.
 //
-// flush(client) -> { sent, remaining, stop, dropped }
+// flush(client) -> { sent, remaining, stop, dropped, superseded }
 //   stop: null, or { kind: 'network' | 'rate_limited' | 'auth', retryAfter, error }
 //   dropped: [{ job, error }] jobs the API rejected for good (400/404/...)
+//   superseded: [{ job, reason }] stops not sent because the timer they were for is gone
+//     ('none_running') or has been replaced by another device's ('different_timer')
+//
+// A timer stop cannot say which timer it means, and the API has no idempotency
+// key for it. Jobs carry `startedAt`, the timer the user was looking at, and
+// `attempts`. A stop that was tried before (the answer may have been lost) or
+// has waited a while checks what is running before it goes out.
 
 const { toIsoOffset } = require('./time');
 
@@ -15,6 +22,12 @@ const KEY = 'nappebble.queue';
 // time in the future" rejections when the phone clock runs a little fast.
 const STALE_MS = 30 * 1000;
 const STAMP_FIELD = { entry: 'time', timer_start: 'start_time', timer_stop: 'end_time' };
+
+function sameInstant(a, b) {
+  const x = Date.parse(a);
+  const y = Date.parse(b);
+  return Number.isNaN(x) || Number.isNaN(y) ? a === b : x === y;
+}
 
 function createQueue(deps) {
   const storage = deps.storage;
@@ -56,6 +69,21 @@ function createQueue(deps) {
     }
   }
 
+  // Resolves to null when the stop may go ahead, else why it must not.
+  function stopMismatch(client, job) {
+    return client.timers(job.babyId).then((timers) => {
+      const running = timers.find((t) => t.type === job.timerType);
+      if (!running) return 'none_running';
+      return sameInstant(running.started_at, job.startedAt) ? null : 'different_timer';
+    });
+  }
+
+  // A stop is about to be tried: is it at risk of hitting someone else's timer?
+  function needsCheck(job) {
+    if (job.kind !== 'timer_stop' || !job.startedAt) return false;
+    return (job.attempts || 0) > 0 || (typeof job.queuedAt === 'number' && now() - job.queuedAt >= STALE_MS);
+  }
+
   function remove(job) {
     jobs = jobs.filter((j) => j.key !== job.key);
     save();
@@ -72,15 +100,28 @@ function createQueue(deps) {
   }
 
   function run(client) {
-    const result = { sent: 0, remaining: 0, stop: null, dropped: [] };
+    const result = { sent: 0, remaining: 0, stop: null, dropped: [], superseded: [] };
+
+    // Resolves once the job has been sent, or has been found not to need sending.
+    function attempt(job) {
+      const check = needsCheck(job);
+      if (job.kind === 'timer_stop') {
+        // Written down before the request goes out: if the answer is lost, the retry knows to check.
+        job.attempts = (job.attempts || 0) + 1;
+        save();
+      }
+      if (!check) return execute(client, job).then(() => null);
+      return stopMismatch(client, job).then((reason) => (reason ? reason : execute(client, job).then(() => null)));
+    }
 
     function next() {
       if (jobs.length === 0) return Promise.resolve();
       const job = jobs[0];
-      return execute(client, job).then(
-        () => {
+      return attempt(job).then(
+        (skipped) => {
           remove(job);
-          result.sent += 1;
+          if (skipped) result.superseded.push({ job, reason: skipped });
+          else result.sent += 1;
           return next();
         },
         (err) => {

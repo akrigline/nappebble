@@ -290,3 +290,163 @@ test('jobs persisted before this field existed still flush (no queuedAt)', async
   const res = await q.flush(h.client);
   assert.equal(res.sent, 1);
 });
+
+// ---- a Stop cannot name the timer it means, so a late or retried one checks first ----
+
+const stopJob = (startedAt, extra) => Object.assign(
+  { kind: 'timer_stop', babyId: BABY.id, timerType: 'sleep', body: undefined, startedAt }, extra
+);
+const stopPosts = (h) => h.state.sent.filter((r) => r.method === 'POST' && r.url.endsWith('/timers/sleep/stop'));
+const timerReads = (h) => h.state.sent.filter((r) => r.method === 'GET' && r.url.endsWith('/timers'));
+
+async function runningSleep(h) {
+  await h.client.startTimer(BABY.id, 'sleep');
+  return (await h.client.timers(BABY.id))[0].started_at;
+}
+
+// Another device stops the timer and starts a fresh one.
+async function partnerRestarts(h) {
+  await h.client.stopTimer(BABY.id, 'sleep');
+  h.clock.t += 5 * MIN;
+  await h.client.startTimer(BABY.id, 'sleep');
+}
+
+test('a fresh stop on a pinned timer goes straight out, with no extra read', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.state.sent.length = 0;
+  h.queue.enqueue(stopJob(pin));
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(res.sent, 1);
+  assert.equal(timerReads(h).length, 0);
+  assert.equal(stopPosts(h).length, 1);
+  assert.deepEqual(await h.client.timers(BABY.id), []);
+});
+
+test('a stop retried after a lost response checks the running timer first, and goes ahead when it is the same one', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin));
+  h.state.down = true;
+  const first = await h.queue.flush(h.client);
+  assert.equal(first.stop.kind, 'network');
+  h.state.down = false;
+  h.state.sent.length = 0;
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(res.sent, 1);
+  assert.deepEqual(res.superseded, []);
+  assert.equal(timerReads(h).length, 1);
+  assert.equal(stopPosts(h).length, 1);
+});
+
+test('a stop retried after another device restarted the timer is dropped, not sent to the new timer', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin));
+  h.state.down = true;
+  await h.queue.flush(h.client);
+  h.state.down = false;
+  await partnerRestarts(h);
+  h.state.sent.length = 0;
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(stopPosts(h).length, 0, 'the partner\'s timer is left alone');
+  assert.equal((await h.client.timers(BABY.id)).length, 1);
+  assert.equal(res.sent, 0);
+  assert.equal(res.superseded.length, 1);
+  assert.equal(res.superseded[0].reason, 'different_timer');
+  assert.equal(h.queue.length(), 0);
+});
+
+test('a retried stop with nothing running is finished without a stop request', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin));
+  h.state.down = true;
+  await h.queue.flush(h.client);
+  h.state.down = false;
+  await h.client.stopTimer(BABY.id, 'sleep');
+  h.state.sent.length = 0;
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(stopPosts(h).length, 0);
+  assert.equal(res.superseded[0].reason, 'none_running');
+  assert.equal(h.queue.length(), 0);
+});
+
+test('a stop that waited in the queue is checked even on its first try', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin));
+  await partnerRestarts(h);          // 5 minutes pass while the phone is offline
+  h.state.sent.length = 0;
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(stopPosts(h).length, 0);
+  assert.equal(res.superseded[0].reason, 'different_timer');
+});
+
+test('the retry mark survives a restart of the phone app', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin));
+  h.state.down = true;
+  await h.queue.flush(h.client);
+  h.state.down = false;
+  await partnerRestarts(h);
+  const restarted = createQueue({ storage: h.storage, uuid: () => 'x', now: () => h.clock.t });
+  h.state.sent.length = 0;
+
+  const res = await restarted.flush(h.client);
+
+  assert.equal(stopPosts(h).length, 0);
+  assert.equal(res.superseded.length, 1);
+});
+
+test('a stop with no pin (queued before this check existed) is sent as before', async () => {
+  const h = setup();
+  await runningSleep(h);
+  h.queue.enqueue(stopJob(undefined));
+  await partnerRestarts(h);
+  h.state.sent.length = 0;
+
+  await h.queue.flush(h.client);
+
+  // The mock refuses it (its stale end_time is before the new timer began; an assumption, see mock-nappi.js),
+  // but what matters is that nothing new is inserted in front of it.
+  assert.equal(stopPosts(h).length, 1);
+  assert.equal(timerReads(h).length, 0);
+});
+
+test('when the check itself cannot be made the stop waits, and nothing is stopped', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin, { attempts: 1 }));
+  h.state.down = true;
+  h.state.sent.length = 0;
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(res.stop.kind, 'network');
+  assert.equal(h.queue.length(), 1);
+  h.state.down = false;
+  assert.equal((await h.client.timers(BABY.id)).length, 1);
+});
+
+test('the same instant written two ways still counts as the same timer', async () => {
+  const h = setup();
+  const pin = await runningSleep(h);
+  h.queue.enqueue(stopJob(pin.replace('Z', '.000Z'), { attempts: 1 }));
+
+  const res = await h.queue.flush(h.client);
+
+  assert.equal(res.sent, 1);
+  assert.deepEqual(res.superseded, []);
+});

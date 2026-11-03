@@ -30,6 +30,7 @@ function harness(opts) {
   settings.update(Object.assign({ token: o.token }, o.stored));
 
   const toWatch = [];
+  let shownKey; // the BABY_KEY in the last state the (simulated) watch received; survives reset()
   const flight = { now: 0, max: 0 };
   const tasks = [];
   const logs = [];
@@ -51,6 +52,7 @@ function harness(opts) {
       },
     }),
     sendToWatch: (dict) => {
+      if ('STATUS' in dict) shownKey = dict.BABY_KEY; // like comm.c: a state with no baby clears it
       flight.now += 1;
       flight.max = Math.max(flight.max, flight.now);
       toWatch.push(dict);
@@ -61,8 +63,17 @@ function harness(opts) {
     log: (m) => { logs.push(m); },
   });
 
+  // Stands in for comm.c: every command carries the key of the baby the watch last was shown.
+  // A test overrides it by naming BABY_KEY itself (undefined means a watch with no data).
+  const watchApp = Object.assign({}, app, {
+    onMessage: (dict) => app.onMessage(
+      'BABY_KEY' in dict || shownKey === undefined ? dict : Object.assign({ BABY_KEY: shownKey }, dict)
+    ),
+  });
+
   return {
-    app, mock, clock, net, settings, storage, toWatch, flight, tasks, logs,
+    app: watchApp, mock, clock, net, settings, storage, toWatch, flight, tasks, logs,
+    queued: () => JSON.parse(storage.getItem('nappebble.queue') || '[]').length,
     reads: () => net.requests.filter((r) => r.method === 'GET'),
     writes: () => net.requests.filter((r) => r.method === 'POST'),
     // The most recent STATE message (ACKs carry no STATUS).

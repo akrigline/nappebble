@@ -83,7 +83,7 @@ These are the short version. ARCHITECTURE.md section 9 has the full list and the
 5. **Text-only UI changes call `grid_view_redraw`; only structural changes call `grid_view_commit`.** Commit rebuilds hit targets and can cancel a touch in progress.
 6. **Never pop a window from inside that window's appear or state handler.** Defer with a 0 ms `AppTimer` and use `window_stack_remove`.
 7. **pkjs is ES2015 only** (bundled by webpack 1): no async/await, no object spread, no trailing commas in calls. `test/syntax.test.js` is a tripwire; `pebble build` is the authority. Only `index.js` may use `Pebble`, `localStorage`, `XMLHttpRequest`.
-8. **Respect nappi's limits**: 12 reads and 30 writes a minute per token, no background polling, ETag only on `entries/latest`, `Idempotency-Key` only on `POST /entries`.
+8. **Respect nappi's limits**: 12 reads and 30 writes a minute per token, no background polling, ETag only on `entries/latest` and `/status` (the app uses neither), `Idempotency-Key` only on `POST /entries`.
 9. **Emery only.** Geometry is hard-coded to 200x228. `main.c` has an `#error` for other platforms; do not add a platform without doing the screen abstraction first (ARCHITECTURE.md ADR-002).
 10. **The token never goes to the watch**, and the API address must be `https://` unless it is localhost or a private network address.
 11. **Never change the app UUID** in `package.json` (`9d7f77ad-...`): it is how the store matches releases to the listing. Bump `version` for every release.

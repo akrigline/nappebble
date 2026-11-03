@@ -6,13 +6,13 @@
 //   makeClient(settings) -> api client
 //   sendToWatch(dict)    -> Promise (logical dict; index.js applies wire.toWire)
 //
-// Read budget (12/min/token): launch costs latest + timers; a refresh is at
-// most once a minute; other babies add one timers read each; a write adds one
-// debounced re-read (latest + timers only), skipped when the budget is low.
+// Read budget (12/min/token): launch costs one status read (timers + latest);
+// a refresh is at most once a minute; other babies add one timers read each; a
+// write adds one debounced re-read (status only), skipped when the budget is low.
 // Nothing polls in the background. Writes have their own limit (30/min).
 
 const { buildConfig, settingsFromClayResponse, rejectedBaseUrl } = require('./config');
-const { resolveActiveBaby } = require('./babies');
+const { resolveActiveBaby, babyKey } = require('./babies');
 const { STATUS, describeError } = require('./protocol');
 const { createQueue, STAMP_FIELD } = require('./queue');
 const { jobsFor, BadCommand } = require('./commands');
@@ -26,7 +26,7 @@ const MIN_REFRESH_MS = 60 * 1000;
 const REREAD_DELAY_MS = 4000;
 const READ_LIMIT = 12;
 const READ_WINDOW_MS = 60 * 1000;
-const REREAD_MIN_BUDGET = 4; // a re-read costs 2 reads; leave room for the next refresh
+const REREAD_MIN_BUDGET = 2; // a re-read costs a read; leave room for the next refresh
 const LATEST_TYPES = ['sleep', 'nursing', 'bottle', 'diaper', 'potty', 'pumping'];
 
 function emptyCache() {
@@ -34,7 +34,7 @@ function emptyCache() {
 }
 
 function emptyBaby() {
-  return { latest: {}, etag: null, timers: [], timersAt: 0, fetchedAt: 0 };
+  return { latest: {}, timers: [], timersAt: 0, fetchedAt: 0 };
 }
 
 function createApp(deps) {
@@ -147,10 +147,16 @@ function createApp(deps) {
           'dropped ' + d.job.kind + ': ' + d.error.message + ' (HTTP ' + d.error.status + ' ' + d.error.code +
           ', queued ' + Math.round((deps.now() - d.job.queuedAt) / 1000) + 's ago, body ' + JSON.stringify(d.job.body) + ')'
         ));
-        Object.keys(cache.perBaby).forEach((id) => { cache.perBaby[id].etag = null; });
         saveCache();
         // The watch already confirmed it; tell it (ACK_ID 0 is "not about any command").
         send({ ACK_ID: 0, ACK_STATUS: STATUS.REJECTED });
+      }
+      if (res.superseded.length) {
+        res.superseded.forEach((d) => log(
+          'stop for ' + d.job.timerType + ' not sent: ' + (d.reason === 'none_running' ? 'it was already stopped' : 'another timer is running now') +
+          ' (queued ' + Math.round((deps.now() - d.job.queuedAt) / 1000) + 's ago)'
+        ));
+        scheduleReread(); // what the watch was shown for that stop is no longer true
       }
       if (res.stop) {
         const failure = describeError(res.stop.error);
@@ -176,7 +182,7 @@ function createApp(deps) {
       writeRetryTask = null;
       const s = settings.get();
       if (!s.token) return undefined;
-      background(() => flushQueue(deps.makeClient(s)).then(() => sendState()));
+      background(() => flushQueue(metered(deps.makeClient(s))).then(() => sendState()));
       return undefined;
     }, Math.max(0, writeBlockedUntil - deps.now()) + 500);
   }
@@ -199,7 +205,7 @@ function createApp(deps) {
 
   function metered(client) {
     const out = Object.assign({}, client);
-    ['listBabies', 'latest', 'timers'].forEach((name) => {
+    ['listBabies', 'latest', 'timers', 'status'].forEach((name) => {
       if (typeof client[name] !== 'function') return;
       out[name] = function () {
         readLog.push(deps.now());
@@ -236,14 +242,11 @@ function createApp(deps) {
       if (baby.id !== s.babyId) settings.update({ babyId: baby.id });
       const per = perBaby(baby.id);
 
-      return Promise.all([
-        client.latest(baby.id, { types: LATEST_TYPES, etag: per.etag }),
-        client.timers(baby.id)
-      ]).then((got) => {
+      // One read for both, so the timers and the entries are from the same moment.
+      return client.status(baby.id, { types: LATEST_TYPES }).then((got) => {
         const at = deps.now();
-        if (!got[0].notModified) per.latest = got[0].data;
-        per.etag = got[0].etag || null;
-        per.timers = got[1];
+        per.latest = got.latest;
+        per.timers = got.timers;
         per.timersAt = at;
         per.fetchedAt = at;
         replayQueue(baby.id, per, at);
@@ -325,15 +328,28 @@ function createApp(deps) {
     return sendState().then(() => (stale ? refresh({ force: true }) : undefined));
   }
 
+  // A Stop cannot say which timer it means. Remember the one the user was looking at, so the
+  // queue can tell if it has been replaced by the time the Stop is delivered. Only a timer the
+  // server reported will do: one this phone guessed at (a Start still waiting in the queue)
+  // gets a start time of the server's choosing.
+  function tiedToTimer(job, per) {
+    if (job.kind !== 'timer_stop') return job;
+    const waitingStart = queue.all().some((q) => q.kind === 'timer_start' && q.babyId === job.babyId && q.timerType === job.timerType);
+    const shown = per.timers.find((t) => t.type === job.timerType);
+    if (waitingStart || !shown || shown.pending) return job;
+    return Object.assign({}, job, { startedAt: shown.started_at });
+  }
+
   function write(dict) {
     const s = settings.get();
     if (!s.token) return ack(dict, STATUS.NO_TOKEN);
     const baby = activeBaby();
     if (!baby) return ack(dict, STATUS.NO_BABY);
-    // The watch says which baby it is showing. If that is no longer the active one
-    // the entry would land on the wrong baby, and there is no delete.
-    if (dict.BABY_INDEX !== undefined && dict.BABY_INDEX !== cache.babies.indexOf(baby)) {
-      log('write for baby ' + dict.BABY_INDEX + ' but the active baby is ' + cache.babies.indexOf(baby));
+    // The watch says which baby it is showing. If that is not the active one the entry would
+    // land on the wrong baby, and there is no delete. A write that names no baby (a watch that
+    // has not been sent one yet) is refused too, and the state it is missing goes out below.
+    if (dict.BABY_KEY !== babyKey(baby.id)) {
+      log('write for baby key ' + dict.BABY_KEY + ' but the active baby is ' + baby.name + ' (' + babyKey(baby.id) + ')');
       ack(dict, STATUS.WRONG_BABY);
       return sendState();
     }
@@ -352,11 +368,12 @@ function createApp(deps) {
       throw e;
     }
 
-    jobs.forEach((job) => {
-      queue.enqueue(job);
-      const per = perBaby(job.babyId);
+    jobs.forEach((planned) => {
+      const per = perBaby(planned.babyId);
       per.timers = rolledTimers(per, now);
       per.timersAt = now;
+      const job = tiedToTimer(planned, per);
+      queue.enqueue(job);
       const view = applyJob({ latest: per.latest, timers: per.timers }, job, { now });
       per.latest = view.latest;
       per.timers = view.timers;
@@ -367,7 +384,7 @@ function createApp(deps) {
     // out in order: ack first for instant feedback, then the optimistic state.
     ack(dict, STATUS.OK);
     const sent = sendState();
-    background(() => flushQueue(deps.makeClient(s)).then(() => {
+    background(() => flushQueue(metered(deps.makeClient(s))).then(() => {
       scheduleReread();
       return sendState();
     }));

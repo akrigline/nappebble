@@ -135,3 +135,37 @@ test('a 200 with a non-JSON body is a bad_response, not a crash', async () => {
     (err) => err instanceof ApiError && err.code === 'bad_response',
   );
 });
+
+test('status is one authenticated GET that returns timers and latest together', async () => {
+  const mock = setup();
+  const { transport, sent } = wire(mock);
+  const client = createClient({ baseUrl: BASE, token: 'good-token', transport });
+  await client.startTimer(PHOEBE.id, 'sleep');
+  sent.length = 0;
+
+  const status = await client.status(PHOEBE.id, { types: ['sleep', 'diaper'] });
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].method, 'GET');
+  assert.equal(sent[0].url, BASE + '/v1/babies/' + PHOEBE.id + '/status?types=sleep,diaper');
+  assert.equal(status.timers.length, 1);
+  assert.equal(status.timers[0].type, 'sleep');
+  assert.deepEqual(Object.keys(status.latest).sort(), ['diaper', 'sleep']);
+});
+
+test('status without types asks for everything', async () => {
+  const { transport, sent } = wire(setup());
+  const client = createClient({ baseUrl: BASE, token: 'good-token', transport });
+
+  await client.status(PHOEBE.id);
+
+  assert.equal(sent[0].url, BASE + '/v1/babies/' + PHOEBE.id + '/status');
+});
+
+test('status raises ApiError on a rate limit, with Retry-After', async () => {
+  const mock = setup();
+  const client = createClient({ baseUrl: BASE, token: 'good-token', transport: (req) => Promise.resolve(mock.handle(req)) });
+  for (let i = 0; i < 12; i++) await client.status(PHOEBE.id);
+
+  await assert.rejects(client.status(PHOEBE.id), (e) => e instanceof ApiError && e.status === 429 && e.retryAfter > 0);
+});

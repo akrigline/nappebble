@@ -164,3 +164,13 @@ test('every key in a built state is a declared message key', () => {
   const s = buildState(view({ status: P.STATUS.RATE_LIMITED, retryAfter: 5 }));
   Object.keys(s).forEach((k) => assert.ok(declared.includes(k), k));
 });
+
+test('the state carries a key for the active baby, derived from the baby\'s id', () => {
+  const { babyKey } = require('../src/pkjs/babies');
+  assert.equal(buildState(view()).BABY_KEY, babyKey('a'));
+  assert.equal(buildState(view({ babies: [PHOEBE, OSCAR], activeIndex: 1 })).BABY_KEY, babyKey('b'));
+});
+
+test('with no baby there is no key', () => {
+  assert.equal('BABY_KEY' in buildState(view({ babies: [], activeIndex: -1 })), false);
+});

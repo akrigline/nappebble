@@ -107,6 +107,14 @@ function createClient(options) {
       return request('GET', baby(babyId) + '/timers').then(value);
     },
 
+    // Running timers and the latest entries in one read -> { timers, latest }. No ETag:
+    // it only ever 304s while no timer is running, and a 304 still costs a read.
+    status(babyId, opts) {
+      const o = opts || {};
+      const query = o.types && o.types.length ? '?types=' + o.types.join(',') : '';
+      return request('GET', baby(babyId) + '/status' + query).then(value);
+    },
+
     logEntry(babyId, body, idempotencyKey) {
       return request('POST', baby(babyId) + '/entries', {
         body,

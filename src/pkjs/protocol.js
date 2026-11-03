@@ -29,8 +29,9 @@ const ACTION = Object.freeze({
 });
 
 // Watch -> phone commands (CMD key, with ARG1..ARG4 and a CMD_ID echoed in the ACK).
-// Every write also carries BABY_INDEX, the baby the watch is showing; the phone
-// refuses it (ACK WRONG_BABY) if that is no longer the active baby.
+// Every write also carries BABY_KEY, the key (babies.js babyKey) of the baby the watch is
+// showing, copied from the last state it got. The phone refuses the write (ACK WRONG_BABY)
+// if the key is missing or is not the active baby's.
 //   LOG_DIAPER    ARG1 DIAPER_*, ARG2 minutes ago
 //   LOG_BOTTLE    ARG1 amount x10, ARG2 BOTTLE_TYPE_*, ARG3 minutes ago,
 //                 ARG4 UNITS_* the amount is in (absent or invalid: the saved bottle units)
@@ -80,7 +81,7 @@ const MESSAGE_KEYS = [
   'STATUS', 'BABY_NAME', 'RETRY_AFTER',
   'CMD', 'CMD_ID', 'ARG1', 'ARG2', 'ARG3', 'ARG4',
   'ACK_ID', 'ACK_STATUS',
-  'BABY_COUNT', 'BABY_INDEX', 'BABY_NAMES', 'BABY_ACCENT', 'OTHER_TIMERS',
+  'BABY_COUNT', 'BABY_INDEX', 'BABY_KEY', 'BABY_NAMES', 'BABY_ACCENT', 'OTHER_TIMERS',
   'BOTTLE_UNITS', 'PUMP_UNITS', 'EXIT_AFTER_LOG', 'DEFAULT_BOTTLE',
   'LAYOUT',
   'LAST[' + Object.keys(ACTION).length + ']',

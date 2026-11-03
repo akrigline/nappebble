@@ -7,7 +7,7 @@
 #define PERSIST_VERSION_KEY 100
 #define PERSIST_CHUNK_KEY 101
 #define PERSIST_CHUNK_SIZE 200
-#define PERSIST_VERSION 2
+#define PERSIST_VERSION 3
 
 #define INBOX_SIZE 1024
 #define OUTBOX_SIZE 128
@@ -122,6 +122,7 @@ static void apply_state(DictionaryIterator *it) {
   if (!t) {
     // Nothing known about a baby yet (no token, bad token, first run offline).
     s->has_data = false;
+    s->baby_key = 0;
     s->baby_name[0] = '\0';
     s->baby_count = 0;
     return;
@@ -132,6 +133,7 @@ static void apply_state(DictionaryIterator *it) {
   if ((t = dict_find(it, MESSAGE_KEY_BABY_NAMES))) snprintf(s->baby_names, sizeof(s->baby_names), "%s", t->value->cstring);
   if (read_int(it, MESSAGE_KEY_BABY_COUNT, &v)) s->baby_count = (uint8_t)v;
   if (read_int(it, MESSAGE_KEY_BABY_INDEX, &v)) s->baby_index = (uint8_t)v;
+  s->baby_key = read_int(it, MESSAGE_KEY_BABY_KEY, &v) ? v : 0;
   if (read_int(it, MESSAGE_KEY_BABY_ACCENT, &v)) s->baby_accent = (uint8_t)v;
   if (read_int(it, MESSAGE_KEY_OTHER_TIMERS, &v)) s->other_timers = v != 0;
   if (read_int(it, MESSAGE_KEY_PENDING, &v)) s->pending = v;
@@ -193,8 +195,7 @@ static void inbox_dropped(AppMessageResult reason, void *context) {
 
 typedef struct {
   int32_t cmd, id, args[4];
-  bool has_baby;
-  int32_t baby_index;
+  int32_t baby_key;   // 0 when the watch has been shown no baby; the phone refuses such a write
 } OutCmd;
 
 static OutCmd s_out[OUT_QUEUE];
@@ -261,7 +262,7 @@ static void out_try(void) {
     dict_write_int32(it, MESSAGE_KEY_ARG2, c->args[1]);
     dict_write_int32(it, MESSAGE_KEY_ARG3, c->args[2]);
     dict_write_int32(it, MESSAGE_KEY_ARG4, c->args[3]);
-    if (c->has_baby) dict_write_int32(it, MESSAGE_KEY_BABY_INDEX, c->baby_index);
+    if (c->baby_key != 0) dict_write_int32(it, MESSAGE_KEY_BABY_KEY, c->baby_key);
     r = app_message_outbox_send();
   }
   if (r == APP_MSG_OK) {
@@ -334,9 +335,9 @@ bool comm_send(int cmd, int32_t a1, int32_t a2, int32_t a3, int32_t a4) {
   c->args[1] = a2;
   c->args[2] = a3;
   c->args[3] = a4;
-  // Name the baby the watch is showing, so the phone can refuse if it has moved on.
-  c->has_baby = s_state.has_data;
-  c->baby_index = s_state.baby_index;
+  // Name the baby the watch is showing, so the phone can refuse if it has moved on. The
+  // phone also refuses a write with no key, so a watch that was shown no baby logs nothing.
+  c->baby_key = s_state.has_data ? s_state.baby_key : 0;
   out_kick();   // held until ready; otherwise sends now if nothing is ahead of it
   return true;
 }

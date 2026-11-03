@@ -153,7 +153,7 @@ The app is independent and is not made by or affiliated with nappi.
 - **Summary:** One app, several babies, with guards against logging for the wrong one.
 - **How it works:** With one baby the header just shows the name. With more, tap the header for a sheet with one big button per baby (the switcher lists up to four). Each baby has an accent colour used in the header and on the log sheets, and every confirmation names the baby ("Phoebe: Wet"). A `*` after the name means another baby has a timer running. The active baby is remembered across launches; the default is chosen in the phone settings. The tile layout is shared by all babies. Every log is for exactly one baby; there is no "both" mode. Every command also names the baby it was meant for, and the phone refuses it if the active baby has changed since ("Baby changed. Try again").
 - **nappi call:** `GET babies`; the other babies get a timers-only read so the `*` can show.
-- **Limits:** The switcher shows at most four babies. With two babies a refresh costs about three of the 12 reads per minute.
+- **Limits:** The switcher shows at most four babies. With two babies a refresh costs about two of the 12 reads per minute.
 
 ### F-12: Logging feedback and offline delivery
 

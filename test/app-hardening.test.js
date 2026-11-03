@@ -6,20 +6,25 @@ const { harness, NOW, PHOEBE, OSCAR, memoryStorage } = require('./support/harnes
 const { WRITE_LIMIT } = require('./support/mock-nappi');
 const { createClient } = require('../src/pkjs/api');
 const P = require('../src/pkjs/protocol');
+const { babyKey } = require('../src/pkjs/babies');
 
 const MIN = 60 * 1000;
 const DIAPER_CMD = (id, type, extra) => Object.assign({ CMD: P.CMD.LOG_DIAPER, CMD_ID: id, ARG1: type, ARG2: 0 }, extra);
 
 // ---------- which baby ----------
+// The watch names the baby it is showing by BABY_KEY, a hash of the baby's id, and the harness
+// fills it in from the last state it was sent, as comm.c does. A write whose key is wrong or
+// missing is refused: there is no delete, so a write on the wrong baby cannot be undone.
 
 test('a write for a baby the watch is no longer showing is refused, not logged to the other baby', async () => {
   const h = harness({ babies: [PHOEBE, OSCAR] });
   await h.app.start();
   h.reset();
-  await h.app.onMessage(DIAPER_CMD(5, P.DIAPER.WET, { BABY_INDEX: 1 })); // watch thinks Oscar; phone has Phoebe
+  await h.app.onMessage(DIAPER_CMD(5, P.DIAPER.WET, { BABY_KEY: babyKey(OSCAR.id) })); // watch thinks Oscar; phone has Phoebe
   await h.app.idle();
   assert.deepEqual(h.acks(), [{ ACK_ID: 5, ACK_STATUS: P.STATUS.WRONG_BABY }]);
   assert.equal(h.writes().length, 0);
+  assert.equal(h.queued(), 0);
   assert.equal(h.state().BABY_NAME, 'Phoebe', 'the watch is sent the real state so it can correct itself');
 });
 
@@ -27,18 +32,53 @@ test('a write for the baby the watch is showing goes through', async () => {
   const h = harness({ babies: [PHOEBE, OSCAR] });
   await h.app.start();
   h.reset();
-  await h.app.onMessage(DIAPER_CMD(6, P.DIAPER.WET, { BABY_INDEX: 0 }));
+  await h.app.onMessage(DIAPER_CMD(6, P.DIAPER.WET));
   await h.app.idle();
   assert.deepEqual(h.acks(), [{ ACK_ID: 6, ACK_STATUS: P.STATUS.OK }]);
   assert.equal(h.writes().length, 1);
 });
 
-test('a write with no BABY_INDEX (a watch with no data yet) is not checked', async () => {
+test('a write with no BABY_KEY (a watch with no data yet) is refused, not guessed at', async () => {
   const h = harness({ babies: [PHOEBE, OSCAR] });
   await h.app.start();
   h.reset();
-  await h.app.onMessage(DIAPER_CMD(7, P.DIAPER.WET));
-  assert.deepEqual(h.acks(), [{ ACK_ID: 7, ACK_STATUS: P.STATUS.OK }]);
+  await h.app.onMessage(DIAPER_CMD(7, P.DIAPER.WET, { BABY_KEY: undefined }));
+  await h.app.idle();
+  assert.deepEqual(h.acks(), [{ ACK_ID: 7, ACK_STATUS: P.STATUS.WRONG_BABY }]);
+  assert.equal(h.writes().length, 0);
+  assert.equal(h.state().BABY_NAME, 'Phoebe', 'and it is sent the state it was missing');
+});
+
+test('a watch still showing another household\'s baby is refused even when that baby sat at the same list position', async () => {
+  // The token changed to another household. Its only baby is now index 0, as Phoebe was.
+  const h = harness({ babies: [OSCAR], stored: { babyId: PHOEBE.id } });
+  await h.app.start();
+  h.reset();
+  await h.app.onMessage(DIAPER_CMD(8, P.DIAPER.WET, { BABY_KEY: babyKey(PHOEBE.id) }));
+  await h.app.idle();
+  assert.deepEqual(h.acks(), [{ ACK_ID: 8, ACK_STATUS: P.STATUS.WRONG_BABY }]);
+  assert.equal(h.writes().length, 0);
+});
+
+test('reordering the baby list does not refuse a write for the baby the watch is showing', async () => {
+  const h = harness({ babies: [OSCAR, PHOEBE], stored: { babyId: PHOEBE.id } });
+  await h.app.start();
+  h.reset();
+  await h.app.onMessage(DIAPER_CMD(9, P.DIAPER.WET, { BABY_KEY: babyKey(PHOEBE.id) })); // she used to be index 0
+  await h.app.idle();
+  assert.deepEqual(h.acks(), [{ ACK_ID: 9, ACK_STATUS: P.STATUS.OK }]);
+  assert.ok(h.writes()[0].url.includes(PHOEBE.id));
+});
+
+test('refresh, baby switch and unit commands do not need a key', async () => {
+  const h = harness({ babies: [PHOEBE, OSCAR] });
+  await h.app.start();
+  await h.app.onMessage({ CMD: P.CMD.REFRESH, ARG1: 1, BABY_KEY: undefined });
+  await h.app.onMessage({ CMD: P.CMD.SWITCH_BABY, ARG1: 1, BABY_KEY: undefined });
+  await h.app.onMessage({ CMD: P.CMD.SET_UNITS, CMD_ID: 3, ARG1: P.UNITS_SCREEN.BOTTLE, ARG2: P.UNITS.ML, BABY_KEY: undefined });
+  await h.app.idle();
+  assert.equal(h.state().BABY_NAME, 'Oscar');
+  assert.deepEqual(h.acks(), [{ ACK_ID: 3, ACK_STATUS: P.STATUS.OK }]);
 });
 
 // ---------- rejected writes ----------
@@ -140,20 +180,20 @@ test('a forced refresh asked for while one is running runs again afterwards, so 
   const forced = h.app.onMessage({ CMD: P.CMD.REFRESH, ARG1: 1 });
   await Promise.all([starting, forced]);
   await h.app.idle();
-  // babies + latest + timers, then latest + timers again.
-  assert.equal(h.reads().length, 5);
+  // babies + status, then status again.
+  assert.equal(h.reads().length, 3);
 });
 
 test('a re-read after a write is skipped when the read budget is nearly spent', async () => {
   const h = harness();
-  await h.app.start(); // 3 reads
-  for (let i = 0; i < 4; i++) await h.app.onMessage({ CMD: P.CMD.REFRESH, ARG1: 1 }); // 8 more
+  await h.app.start(); // 2 reads
+  for (let i = 0; i < 9; i++) await h.app.onMessage({ CMD: P.CMD.REFRESH, ARG1: 1 }); // 9 more
   await h.app.onMessage(DIAPER_CMD(1, P.DIAPER.WET));
   await h.app.idle();
   const shown = h.state();
   h.reset();
   await h.runScheduled();
-  assert.equal(h.reads().length, 0, 'no re-read with fewer than 4 reads left');
+  assert.equal(h.reads().length, 0, 'no re-read with fewer than 2 reads left');
   assert.equal(shown.LAST[P.ACTION.DIAPER], Math.floor(NOW / 1000), 'the optimistic entry is what the watch was last shown');
 });
 
@@ -164,7 +204,7 @@ test('a re-read after a write does not read the other babies\' timers', async ()
   await h.app.idle();
   h.reset();
   await h.runScheduled();
-  assert.equal(h.reads().length, 2, 'latest + timers for the active baby only');
+  assert.equal(h.reads().length, 1, 'status for the active baby only');
 });
 
 // ---------- Retry-After ----------

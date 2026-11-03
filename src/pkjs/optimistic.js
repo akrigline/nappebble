@@ -59,7 +59,8 @@ function startTimer(view, job, ctx) {
     type: job.timerType,
     started_at: toIsoZ(start),
     paused: false,
-    elapsed_seconds: Math.max(0, Math.floor((ctx.now - start) / 1000))
+    elapsed_seconds: Math.max(0, Math.floor((ctx.now - start) / 1000)),
+    pending: true // our guess: the server will pick its own start time
   };
   if (job.timerType === 'nursing') {
     timer.side = body.side === 'left' || body.side === 'right' ? body.side : null;

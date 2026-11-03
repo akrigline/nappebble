@@ -37,7 +37,7 @@ Three places hold state, and they never share a store:
 
 | Where | What | Lifetime |
 |---|---|---|
-| Phone `localStorage` | `nappebble.settings` (token, baby, units, layout, base URL), `nappebble.cache` (babies, latest entries, ETags, timers), `nappebble.queue` (pending writes) | Survives app restarts; cleared when the app is uninstalled |
+| Phone `localStorage` | `nappebble.settings` (token, baby, units, layout, base URL), `nappebble.cache` (babies, latest entries, timers), `nappebble.queue` (pending writes) | Survives app restarts; cleared when the app is uninstalled |
 | Watch persistent storage | The last `WatchState` (keys 100 and up), last bottle and pump amounts (111, 112) | Written at exit; read at launch |
 | nappi | The truth for entries and timers | Shared with other caregivers' devices |
 
@@ -62,9 +62,11 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 
 - Bearer token, and the token's owner needs nappi Premium. Tokens are created in nappi's connections page and shown once.
 - **Rate limits: 12 reads and 30 writes per minute per token**, with `Retry-After` on 429. nappi asks for at most one poll a minute. A 304 is assumed (not documented) to count as a read.
-- ETag and `If-None-Match` exist **only** on the two `entries/latest` endpoints. `Idempotency-Key` exists **only** on `POST /entries`.
+- ETag and `If-None-Match` exist **only** on the two `entries/latest` endpoints and on `GET /status`, and `/status` only answers 304 while no timer is running. The app uses none of them (ADR-020). `Idempotency-Key` exists **only** on `POST /entries`.
+- `GET /babies/{id}/status` returns the running timers and the latest entries in one read (same data as `/timers` and `/entries/latest`). It is in the live OpenAPI spec but not in the 2026-10 snapshot in `/docs`.
 - **No edit or delete endpoints.** Solids and medication are read-only. This single fact is behind most of the app's caution (ADR-006, ADR-010).
 - Timers (sleep, nursing, pumping) are household-shared: another phone can start, pause or stop them. Start on a running timer returns 200 `already_running`. Stop on a stopped timer returns 409 `timer_not_running`. Timers carry `paused` and `elapsed_seconds`.
+- A Stop names no timer (no id, no `started_at` precondition, no idempotency key): it stops whatever timer of that type is running. A timer's `started_at` is the only identity it has (ADR-021).
 - Times must be ISO 8601 with an offset. Amounts are millilitres unless `unit: "oz"` is sent; latest-entry responses always report ml. Nursing `side: both` is valid only when starting a timer. A logged nursing entry needs durations, so live nursing goes through timers.
 - Error bodies are `{"error": {"code", "message"}}`. Codes the docs name: `unauthorized`, `token_expired`, `premium_required`, `timer_not_running`. The docs give no code for 429 or 404, so the client branches on HTTP status.
 - Calls the app makes: `GET /v1/babies`, `GET /v1/babies/{id}/entries/latest?types=...`, `GET /v1/babies/{id}/timers`, `POST /v1/babies/{id}/entries`, `POST /v1/babies/{id}/timers/{sleep|nursing|pumping}/start|stop`.
@@ -89,14 +91,14 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 | `app.js` | The engine. Owns the cache, the read budget, throttled refresh, the queue flush, command handling and state building. Everything it needs from the runtime is injected, so it runs under test. |
 | `api.js` | nappi client. Takes a `transport(req) -> Promise<{status, headers, body}>`. Maps error bodies to `ApiError {code, status, retryAfter}`. |
 | `xhr-transport.js` | Transport over XHR with its own watchdog (ADR-008 note), since the emulator's XHR can hang silently. |
-| `queue.js` | Durable, ordered write queue with idempotency keys, late-delivery stamping and the rules for what is retried, dropped or done. |
+| `queue.js` | Durable, ordered write queue with idempotency keys, late-delivery stamping, the check that a late or retried Stop still has its timer (ADR-021), and the rules for what is retried, dropped or done. |
 | `commands.js` | Pure: watch command dict to queue jobs (`entry`, `timer_start`, `timer_stop`). Validates ranges, throws `BadCommand`. |
 | `optimistic.js` | Pure: predicts what a queued job will look like in the cache so the watch can show it at once. |
 | `state.js` | Pure: cache + settings to the compact `STATE` dict (epoch seconds and small enums; the watch formats text). |
 | `protocol.js` | **Source of truth** for enums, command ids, status codes and the AppMessage key list. |
 | `wire.js` | Logical dict to numeric AppMessage keys (array keys like `LAST[7]` spread to consecutive ids). |
 | `settings.js`, `config.js` | Settings blob and defaults; Clay config builder and response parser, including the base-URL rule (ADR-014). |
-| `babies.js`, `time.js`, `uuid.js` | Active-baby resolution, ISO 8601 helpers, v4 UUIDs. |
+| `babies.js`, `time.js`, `uuid.js` | Active-baby resolution and `babyKey` (ADR-022), ISO 8601 helpers, v4 UUIDs. |
 
 ### 4.2 Watch (`src/c/`)
 
@@ -118,7 +120,7 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 `protocol.js` is the source of truth. `src/c/logic/protocol.h` and `package.json#pebble.messageKeys` must agree with it; `test/protocol-sync.test.js` fails the build if they do not.
 
 - **Phone to watch:** `JS_READY` (first message on every start), then `STATE` (several keys: `STATUS`, `BABY_*`, `LAST[7]`, `INFO[7]`, `TIMER_*[3]`, `TIMER_AT`, `BOTTLE_UNITS`, `PUMP_UNITS`, `EXIT_AFTER_LOG`, `DEFAULT_BOTTLE`, `LAYOUT`, `PENDING`, `OTHER_TIMERS`, `RETRY_AFTER`), and `ACK_ID` + `ACK_STATUS`.
-- **Watch to phone:** `CMD` + `CMD_ID` + `ARG1..ARG4` (+ `BABY_INDEX` on every write). Commands: `REFRESH`, `LOG_DIAPER`, `LOG_BOTTLE`, `LOG_POTTY`, `TIMER_START`, `TIMER_STOP`, `SWITCH_BABY`, `TIMER_SWITCH`, `SET_UNITS`. Id 5 (`LOG_ACTIVITY`) is retired and must not be reused.
+- **Watch to phone:** `CMD` + `CMD_ID` + `ARG1..ARG4` (+ `BABY_KEY` on every write). Commands: `REFRESH`, `LOG_DIAPER`, `LOG_BOTTLE`, `LOG_POTTY`, `TIMER_START`, `TIMER_STOP`, `SWITCH_BABY`, `TIMER_SWITCH`, `SET_UNITS`. Id 5 (`LOG_ACTIVITY`) is retired and must not be reused.
 - Argument meanings per command are documented above `CMD` in `protocol.js`; read them there rather than from a copy.
 - Payloads carry epoch seconds and small ints. Amounts travel as value x10 (so 2.5 oz is 25), and **the unit travels with the command** (ADR-015).
 - `ACK_ID 0` with `ACK_STATUS REJECTED` is the phone telling the watch, unprompted, that nappi refused a write it had already confirmed.
@@ -136,7 +138,7 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 
 1. Tap on a sheet button calls `ui_send(...)`. It refuses if a command is already in flight ("Still sending") or the action is inside its 1.5 s lockout, then `comm_send`s and shows "Sending...".
 2. `comm.c` holds the command until the ready gate opens, then hands it to AppMessage (retrying a busy or NACKing outbox, never a timed-out send).
-3. Phone `write()` checks token, baby and `BABY_INDEX`, turns the command into jobs (`commands.js`), enqueues them (each gets a UUID key and `queuedAt`), applies them optimistically to the cache, then sends **`ACK` first, then `STATE`** (whose `PENDING` already counts the new write), then flushes the queue in the background.
+3. Phone `write()` checks token, baby and `BABY_KEY`, turns the command into jobs (`commands.js`), enqueues them (each gets a UUID key and `queuedAt`; a Stop also records the timer it was for, ADR-021), applies them optimistically to the cache, then sends **`ACK` first, then `STATE`** (whose `PENDING` already counts the new write), then flushes the queue in the background.
 4. The watch shows the checkmark and vibrates **only on the ACK**. Delivery to nappi happens afterwards; the ACK means "safely queued on the phone".
 5. After the flush the phone schedules one debounced re-read (4 s) and sends a final `STATE`.
 
@@ -155,8 +157,8 @@ Nothing polls in the background. Reads happen on launch, at most once a minute w
 ### 6.1 Phone
 
 - **Settings** (`nappebble.settings`): token, babyId, bottleUnits, pumpUnits, baseUrl, layout (ordered action names, Status appended by `state.js`), defaultBottleType, exitAfterLog. The token never goes to the watch.
-- **Cache** (`nappebble.cache`): babies; per baby `latest`, `etag`, `timers`, `timersAt`, `fetchedAt`; and `others` (whether another baby has a running timer). Cleared when the token changes. Queued writes are laid back over every read (ADR-012).
-- **Queue** (`nappebble.queue`): array of `{kind, babyId, body, timerType?, key, queuedAt}`, strictly ordered. The first job that cannot be delivered holds the rest back.
+- **Cache** (`nappebble.cache`): babies; per baby `latest`, `timers`, `timersAt`, `fetchedAt` (older caches also hold an unused `etag`); and `others` (whether another baby has a running timer). Cleared when the token changes. Queued writes are laid back over every read (ADR-012).
+- **Queue** (`nappebble.queue`): array of `{kind, babyId, body, timerType?, key, queuedAt, startedAt?, attempts?}`, strictly ordered. The first job that cannot be delivered holds the rest back. `startedAt` and `attempts` exist only on `timer_stop` jobs (ADR-021); a job without them is delivered as before.
 
 ### 6.2 Watch
 
@@ -180,7 +182,8 @@ These are load-bearing; change them together with the reasoning in the ADR that 
 | Outbox | 4 slots, 4 tries, 600 ms apart | `comm.c` | Retries busy outbox, disconnect, NACK |
 | Long press / swipe | 500 ms / 40 px | `logic/touch_fsm.h` | |
 | Refresh throttle | 60 s | `app.js` `MIN_REFRESH_MS` | nappi asks for one poll a minute |
-| Re-read after write | 4 s debounce; skipped with fewer than 4 reads left | `app.js` | Leaves room for the next refresh |
+| Re-read after write | 4 s debounce; skipped with fewer than 2 reads left | `app.js` | Leaves room for the next refresh |
+| Stop check | a Stop tried before, or queued more than 30 s ago, reads `/timers` first | `queue.js` `STALE_MS` | See ADR-021 |
 | Late-write stamp | queued more than 30 s ago | `queue.js` `STALE_MS` | See ADR-011 |
 | XHR timeout / watchdog | 20 s / 25 s | `xhr-transport.js` | |
 
@@ -222,7 +225,7 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 
 ### ADR-005: The phone owns a durable, ordered write queue with idempotency keys
 
-- Status: Accepted (2026-10-24)
+- Status: Accepted (2026-10-24); the Stop-retry exposure it names is narrowed by ADR-021
 - Context: The phone is often offline or rate limited; a retry must never double-log; the API has no delete.
 - Decision: Every write becomes a job with a UUID `Idempotency-Key` created at enqueue time, persisted before the watch is ACKed, and delivered strictly in order. 429, 5xx and network errors stop the queue and retry later (a 429 schedules its own retry); 401/403 stop it as an auth failure; other 4xx drop the job and tell the watch (`REJECTED`); a stop that returns 409 `timer_not_running` counts as done.
 - Consequences: Entries are safe to retry. Timer start and stop are not covered by an idempotency key (the API offers none) and rely on the API's own `already_running` and `timer_not_running` semantics. A job that fails deterministically with 5xx blocks later writes with no cap (section 10).
@@ -230,7 +233,7 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 
 ### ADR-006: The watch tells the truth about what it knows
 
-- Status: Accepted (2026-10-28, after review)
+- Status: Accepted (2026-10-28, after review); the `BABY_INDEX` guard in its last bullet is superseded by ADR-022
 - Context: There is no delete, so "logged" shown for an entry that never arrived, or a prompt to retry something that did, is the worst failure the app can have.
 - Decision:
   - The checkmark and vibration appear only when the phone's ACK for that command id arrives.
@@ -253,7 +256,7 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 
 ### ADR-008: Strict read budget, no background polling
 
-- Status: Accepted (2026-10-24)
+- Status: Accepted (2026-10-24); the per-refresh read counts and the ETag are superseded by ADR-020
 - Context: 12 reads/min and 30 writes/min per token; nappi asks for at most one poll a minute; a baby with a running timer should not wake the phone constantly.
 - Decision: The engine counts its own reads in a sliding minute and meters the client. Refresh is throttled to one a minute unless forced. Each refresh costs 2 reads for the active baby plus 1 timers read per other baby. The debounced post-write re-read is "light" (active baby only) and skipped when fewer than 4 reads remain; because the queue is replayed over every read (ADR-012), skipping it costs freshness, not correctness. Read and write limits are independent: a write 429 sets `writeBlockedUntil` only and schedules its own retry. The ETag is kept per baby. A dedicated token is recommended because limits are per token. The XHR transport has a watchdog because the emulator's XHR can fail silently.
 - Consequences: The tile "ago" values can be up to a minute stale. Verification `curl`s against the mock share the app's token and eat its 12 reads.
@@ -287,7 +290,7 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 
 - Status: Accepted (2026-10-24)
 - Context: The watch should show a log at once, and a refresh must not make a still-queued log vanish.
-- Decision: `optimistic.js` applies each job to the cached `latest` and `timers`. After every read, `readEverything` replays `queue.all()` for that baby over the server data. A rejected job clears all ETags (so the next read replaces the wrong guess) and sends the watch an unprompted `REJECTED`.
+- Decision: `optimistic.js` applies each job to the cached `latest` and `timers`. After every read, `readEverything` replays `queue.all()` for that baby over the server data. A rejected job sends the watch an unprompted `REJECTED` (reads carry no ETag since ADR-020, so the next read replaces the wrong guess).
 - Consequences: Pending entries appear on tiles before nappi has them; the Status tile shows the pending count.
 - Code: `optimistic.js`, `app.js` `replayQueue`.
 
@@ -344,6 +347,30 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 - Consequences: The mock encodes assumptions about undocumented behaviour (listed at its top). Behaviour seen against the real API that contradicts one is a bug in the mock first.
 - Code: `test/support/`.
 
+### ADR-020: One `/status` read per baby, with no ETag
+
+- Status: Accepted (2026-11-03). Supersedes the read counts and ETag handling in ADR-008.
+- Context: A refresh made two reads per baby (`entries/latest`, `timers`) against 12 reads a minute, and the two answers were from different moments, so a Stop landing between them could show a running timer beside the entry it had just produced. The live API spec has `GET /babies/{id}/status`, which returns `{timers, latest}` in one read (the 2026-10 snapshot did not).
+- Decision: `readEverything` calls `api.status(babyId, {types})` for the active baby. Other babies still get the lighter `/timers`. The call carries no `If-None-Match`: `/status` only answers 304 while no timer is running, and a 304 is assumed to cost a read anyway, so the ETag saved only bandwidth and meant keeping a cached copy that the queue had already been laid over. `metered()` counts `status` as a read. A refresh costs 1 read for the active baby plus 1 per other baby; the post-write re-read is skipped with fewer than 2 reads left.
+- Consequences: A one-baby household uses half the reads. `latest` and `timers` always agree. `api.latest()` and its ETag support remain, unused by the engine. A cache saved by an older version may still hold an `etag` per baby, which is ignored. `/status` is absent from the 2026-10 snapshot in `/docs`, so the mock encodes it from the live spec.
+- Code: `api.js` `status`, `app.js` `readEverything`/`metered`, `test/support/mock-nappi.js`.
+
+### ADR-021: A late or retried Stop checks that its timer is still the one running
+
+- Status: Accepted (2026-11-03). Narrows the exposure named in ADR-005 and ADR-010.
+- Context: A Stop stops whatever timer of that type is running, and the API gives it nothing to say which. If the Stop's response is lost, or the phone is offline for a while, the retry can arrive after another device has stopped that timer and started a new one, and would stop the new one. There is no delete.
+- Decision: When a Stop is queued, `app.js` records the `started_at` of the timer the user was looking at as `startedAt`, but only if the server reported it: a timer the phone only guessed at (`pending`, from a Start still in the queue) gets its start time from the server, so it can never match and the Stop is left unpinned. `queue.js` counts `attempts` on every Stop, saved before the request goes out. A pinned Stop that has been tried before, or was queued 30 s or more ago, first reads `/timers`. If no timer of that type is running, or its `started_at` differs (compared as instants), the Stop is not sent: the job is removed, reported as `superseded`, logged, and a re-read is scheduled. If the check read fails, the Stop waits like any other failed job. The check read is metered.
+- Consequences: A fresh Stop costs nothing extra. A retried or late one costs one read. The window shrinks from minutes or hours to one round trip but does not close: only a `started_at` precondition or an idempotency key on the API's Stop would. The watch is not told when a Stop is superseded (it already showed "saved"); the re-read shows what is really running. Jobs queued before this change have no `startedAt` and are sent as before.
+- Code: `queue.js` `needsCheck`/`stopMismatch`, `app.js` `tiedToTimer`, `optimistic.js` (`pending` flag).
+
+### ADR-022: Writes name the baby by a key derived from its id
+
+- Status: Accepted (2026-11-03). Supersedes the `BABY_INDEX` guard in ADR-006.
+- Context: The guard compared the baby's position in the list. The list is replaced when the token changes or the settings page opens, and the same position can then be a different baby, even in a different household. It also let a write through when the watch sent no index.
+- Decision: `STATE` carries `BABY_KEY`, a 31-bit FNV-1a hash of the active baby's whole id (never 0). The watch stores it in `WatchState.baby_key` and sends it with every command. `write()` refuses (`WRONG_BABY`, then a fresh `STATE`) any write whose key is missing or is not the active baby's. `BABY_INDEX` stays in `STATE` for the switcher but is no longer sent back. The whole id is hashed because time-ordered ids share their leading digits.
+- Consequences: `WatchState` grew by 4 bytes, so `PERSIST_VERSION` is 3 and a watch upgraded from 2 starts without its cached state until the phone sends one. A watch that has been shown no baby cannot log anything. A hash collision between two babies of one household is possible in principle (about 1 in 2^31) and would let a write through to the wrong one. `SWITCH_BABY` still takes a list position, which the visible baby name makes self-correcting.
+- Code: `babies.js` `babyKey`, `state.js`, `app.js` `write`, `comm.c`, `logic/model.h`, `protocol.js`.
+
 ## 9. Rules for changing the code
 
 1. **Protocol changes**: edit `protocol.js`, `protocol.h` and `package.json#pebble.messageKeys` together; add the argument meanings to the comment above `CMD`; run `pebble clean` before `pebble build`; keep `JS_READY` first on start. Do not reuse retired ids.
@@ -391,11 +418,10 @@ Ordered roughly by how much they matter.
 
 | Item | Detail |
 |---|---|
-| Stop retried after a lost response | May stop a timer another device has just started. A 409 is treated as done. |
+| Stop checked, not guaranteed | A retried or late Stop reads `/timers` first (ADR-021), but between that read and the Stop another device can still start a timer. The API has no way to close that gap. A retried **Start** after a lost response has the mirror problem: it can start a timer after someone else stopped the first. |
 | Queue not tied to the token | Changing the token clears the cache but not queued writes, which then 404 and surface as "nappi rejected a log". A 401/403 halts the whole queue. |
 | Queue has no retry cap or age-out | A job that fails forever with 5xx blocks later writes. 408 and 425 are dropped though retryable. |
 | `SET_UNITS` NACK / settings-page unit change | An open sheet can disagree with the phone's saved unit until reopened (ADR-015). |
-| Wrong-baby guard compares an index, not an id | If the baby list is reordered between watch and phone, indexes can line up by coincidence. Not guarded when the watch has no data. |
 | Full outbox reads as "Phone not connected" | `comm_send` returns the same `false` for both. |
 | Nursing Stop and Switch share one lockout | A Stop within 1.5 s of a switch is dropped with no message. |
 | No persistent last-error line on the Status sheet | Errors show in the header and as banners only. |

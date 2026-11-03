@@ -193,3 +193,48 @@ test('timer reads count against the read budget, starts and stops against writes
   assert.equal(api.get(TIMERS).status, 429);
   assert.equal(api.post(TIMERS + '/sleep/start').status, 201);
 });
+
+// ---- GET /v1/babies/{id}/status: timers and latest entries in one read (live spec, not in the 2026-10 snapshot) ----
+
+const STATUS_PATH = `/v1/babies/${BABY.id}/status`;
+
+test('status returns the running timers and the latest entries, as /timers and /entries/latest do', () => {
+  const { api } = setup();
+  api.post(`${TIMERS}/sleep/start`, {});
+  api.post(`/v1/babies/${BABY.id}/entries`, { type: 'diaper', diaper_type: 'wet' });
+
+  const res = api.get(STATUS_PATH);
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.json.timers, api.get(TIMERS).json);
+  assert.deepEqual(res.json.latest, api.get(LATEST).json);
+});
+
+test('status honours the types filter for latest and still lists every timer', () => {
+  const { api } = setup();
+  api.post(`${TIMERS}/nursing/start`, {});
+
+  const res = api.get(STATUS_PATH + '?types=diaper,sleep');
+
+  assert.deepEqual(Object.keys(res.json.latest).sort(), ['diaper', 'sleep']);
+  assert.equal(res.json.timers.length, 1);
+});
+
+test('status rejects an unknown type like entries/latest does', () => {
+  const { api } = setup();
+  assert.equal(api.get(STATUS_PATH + '?types=nope').status, 400);
+});
+
+test('status counts as one read against the 12 a minute', () => {
+  const { api } = setup();
+  for (let i = 0; i < 12; i++) assert.equal(api.get(STATUS_PATH).status, 200);
+  assert.equal(api.get(STATUS_PATH).status, 429);
+});
+
+test('status needs a token and a known baby', () => {
+  const { mock } = setup();
+  const anon = mock.handle({ method: 'GET', url: 'https://api.nappi.app' + STATUS_PATH, headers: {} });
+  assert.equal(anon.status, 401);
+  const { api } = setup();
+  assert.equal(api.get('/v1/babies/nope/status').status, 404);
+});
