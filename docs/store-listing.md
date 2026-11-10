@@ -51,7 +51,11 @@ nappebble is an independent project by its developer. It is not made or supporte
 ## Release notes (0.2.0)
 
 ```
-Switch side now keeps a nursing feed as one entry instead of stopping and starting a new one. The nursing start sheet offers Left and Right only. Updated for the current Pebble SDK: the app now declares that it needs internet access to reach nappi, so the Pebble app will ask you to allow it.
+0.2.0
+- Switch side now keeps a nursing feed as one entry instead of stopping it and starting a new one.
+- The nursing start sheet offers Left and Right only (no Both).
+- Switch side is greyed out for a feed that has no side, such as one started in another app.
+- Updated for the current Pebble SDK: the app now declares that it uses the internet to reach nappi, so the Pebble app may ask you to allow it.
 ```
 
 ## Release notes (0.1.0)
