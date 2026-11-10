@@ -6,7 +6,7 @@ Guidance for AI agents (and humans) working on nappebble. Read this first; it po
 
 nappebble is a Pebble Time 2 (Emery, 200x228, colour e-paper, touch) watchapp for logging a baby's feeds, diapers, potty, sleep and pumping to the [nappi](https://nappi.app) baby tracker through nappi's public API. A C watch app handles the UI; PebbleKit JS on the phone handles the token, HTTP, cache and offline queue; the two talk over AppMessage. Goal: two taps from the launcher to a logged entry.
 
-The project is at v0.2.0 and is in daily use on a Pebble Time 2 with a real phone and the real nappi API.
+The project is at v0.2.1 and is in daily use on a Pebble Time 2 with a real phone and the real nappi API.
 
 ## Where to read
 

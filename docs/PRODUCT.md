@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Current. Describes what the code does at v0.2.0, in daily use. |
+| Status | Current. Describes what the code does at v0.2.1, in daily use. |
 | Last reviewed | 2026-10-29 |
 | Audience | Anyone who needs to know what the app does and what it will not do: product, support, store copy, engineers |
 | Read with | [ARCHITECTURE.md](ARCHITECTURE.md) (how and why it is built), [store-listing.md](store-listing.md) (store copy), [../AGENTS.md](../AGENTS.md) |

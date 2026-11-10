@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Current. Matches the code at v0.2.0, which is in daily use on a Time 2 with the real nappi API. |
+| Status | Current. Matches the code at v0.2.1, which is in daily use on a Time 2 with the real nappi API. |
 | Last reviewed | 2026-11-03 |
 | Audience | Anyone changing the code: engineers and agents |
 | Read with | [PRODUCT.md](PRODUCT.md) (what the app does), [../AGENTS.md](../AGENTS.md) (how to work in the repo), [store-listing.md](store-listing.md) (release checklist) |

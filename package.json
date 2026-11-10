@@ -1,7 +1,7 @@
 {
   "name": "nappebble",
   "author": "akrigline",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Pebble Time 2 watchapp for logging feeds, diapers and sleep to the nappi baby tracker",
   "keywords": [
     "pebble-app"

@@ -10,7 +10,7 @@ Everything the Developer Dashboard (or `pebble publish`) asks for. Field limits 
 | Type | Watchapp (`watchface: false`) |
 | Category | Health & Fitness |
 | Platforms | emery (Pebble Time 2). Gabbro is a later port. |
-| Version | 0.2.0 (every release needs a new, higher version) |
+| Version | 0.2.1 (every release needs a new, higher version) |
 | UUID | `9d7f77ad-7857-480d-b1fa-73eff0df3926`. Never change it: it is how the store matches releases to this listing. |
 | Website URL | https://github.com/akrigline/nappebble (the repo must be made public before publishing) |
 | Source code URL | https://github.com/akrigline/nappebble |
@@ -48,10 +48,12 @@ Your token stays in the Pebble app on your phone. nappebble only talks to api.na
 nappebble is an independent project by its developer. It is not made or supported by nappi; it just uses nappi's public API.
 ```
 
-## Release notes (0.2.0)
+## Release notes (0.2.1)
+
+0.2.0 was uploaded but never made visible (the Pebble tool cannot publish an existing version), so 0.2.1 carries its notes.
 
 ```
-0.2.0
+0.2.1
 - Switch side now keeps a nursing feed as one entry instead of stopping it and starting a new one.
 - The nursing start sheet offers Left and Right only (no Both).
 - Switch side is greyed out for a feed that has no side, such as one started in another app.
