@@ -104,9 +104,11 @@ test('starting a sleep timer has no body; backdating sets start_time', () => {
   assert.equal(back.body.start_time, '2026-10-24T14:15:00-04:00');
 });
 
-test('starting nursing sends the side, including both', () => {
+test('starting nursing sends the side, and there is no "both" to send', () => {
   assert.deepEqual(one({ CMD: P.CMD.TIMER_START, ARG1: P.TIMER.NURSING, ARG2: P.SIDE.LEFT, ARG3: 0 }).body, { side: 'left' });
-  assert.deepEqual(one({ CMD: P.CMD.TIMER_START, ARG1: P.TIMER.NURSING, ARG2: P.SIDE.BOTH, ARG3: 0 }).body, { side: 'both' });
+  assert.deepEqual(one({ CMD: P.CMD.TIMER_START, ARG1: P.TIMER.NURSING, ARG2: P.SIDE.RIGHT, ARG3: 0 }).body, { side: 'right' });
+  assert.equal(P.SIDE.BOTH, undefined);
+  assert.throws(() => jobsFor({ CMD: P.CMD.TIMER_START, ARG1: P.TIMER.NURSING, ARG2: 3, ARG3: 0 }, ctx), BadCommand);
 });
 
 test('a side is ignored on timers that have none', () => {
@@ -123,12 +125,12 @@ test('stopping nursing can override the side; stopping pumping carries amount an
   assert.deepEqual(one({ CMD: P.CMD.TIMER_STOP, ARG1: P.TIMER.PUMPING, ARG2: 0, ARG3: 45 }).body, { amount: 4.5, unit: 'oz' });
 });
 
-test('switching nursing sides is a stop followed by a start on the other side', () => {
+test('switching nursing sides is one switch job, so the feed stays one entry', () => {
   const jobs = jobsFor({ CMD: P.CMD.TIMER_SWITCH, ARG1: P.SIDE.RIGHT }, ctx);
   assert.deepEqual(jobs, [
-    { kind: 'timer_stop', babyId: 'baby-1', timerType: 'nursing', body: undefined },
-    { kind: 'timer_start', babyId: 'baby-1', timerType: 'nursing', body: { side: 'right' } },
+    { kind: 'timer_switch', babyId: 'baby-1', timerType: 'nursing', body: { side: 'right' } },
   ]);
+  assert.deepEqual(jobsFor({ CMD: P.CMD.TIMER_SWITCH, ARG1: P.SIDE.LEFT }, ctx)[0].body, { side: 'left' });
 });
 
 test('commands that are not writes produce no jobs', () => {

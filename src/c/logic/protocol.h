@@ -63,7 +63,6 @@
 #define SIDE_NONE 0
 #define SIDE_LEFT 1
 #define SIDE_RIGHT 2
-#define SIDE_BOTH 3
 
 #define UNITS_OZ 0
 #define UNITS_ML 1

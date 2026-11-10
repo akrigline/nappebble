@@ -6,7 +6,7 @@ Guidance for AI agents (and humans) working on nappebble. Read this first; it po
 
 nappebble is a Pebble Time 2 (Emery, 200x228, colour e-paper, touch) watchapp for logging a baby's feeds, diapers, potty, sleep and pumping to the [nappi](https://nappi.app) baby tracker through nappi's public API. A C watch app handles the UI; PebbleKit JS on the phone handles the token, HTTP, cache and offline queue; the two talk over AppMessage. Goal: two taps from the launcher to a logged entry.
 
-The project is at v0.1.0 and is in daily use on a Pebble Time 2 with a real phone and the real nappi API.
+The project is at v0.2.0 and is in daily use on a Pebble Time 2 with a real phone and the real nappi API.
 
 ## Where to read
 
@@ -28,7 +28,7 @@ npm ci                          # install (pebble-clay is the only dependency)
 npm test                        # JS tests (node:test), then host-side C tests; needs no Pebble tooling
 npm run test:js                 # JS half only
 npm run test:c                  # C half only (gcc, -Wall -Wextra -Werror -pedantic)
-pebble clean && pebble build    # emery .pbw (SDK 4.33.1); needs the Pebble SDK
+pebble clean && pebble build    # emery .pbw (SDK 4.44); needs the Pebble SDK
 SEED=1 TWO_BABIES=1 npm run mock   # fake nappi API on http://127.0.0.1:4010, with some history
 pebble install --emulator emery
 pebble logs --emulator emery

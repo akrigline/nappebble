@@ -270,7 +270,7 @@ void sheet_potty(void) {
 }
 
 static void nursing_choose(GridView *gv, int k) {
-  int side = k + 1;   // SIDE_LEFT, SIDE_RIGHT, SIDE_BOTH
+  int side = k + 1;   // SIDE_LEFT, SIDE_RIGHT
   char what[32];
   snprintf(what, sizeof(what), "Nursing %s", model_side_label(side));
   ui_send(ACTION_NURSING, what, CMD_TIMER_START, TIMER_NURSING, side, minutes_ago(gv), 0);
@@ -281,10 +281,10 @@ void sheet_nursing_start(void) {
   if (!gv) return;
   SheetCtx *c = ctx_of(gv);
   add_time_strip(gv, c);
-  static const Rect cells[3] = { { 3, BUTTONS_Y, 95, 78 }, { 102, BUTTONS_Y, 95, 78 }, { 3, 148, 194, 76 } };
-  const char *labels[3];
-  for (int i = 0; i < 3; i++) labels[i] = model_side_label(i + 1);
-  add_buttons(gv, c, cells, labels, 3, ui_action_color(ACTION_NURSING), 0);
+  static const Rect cells[2] = { { 3, BUTTONS_Y, 95, 158 }, { 102, BUTTONS_Y, 95, 158 } };
+  const char *labels[2];
+  for (int i = 0; i < 2; i++) labels[i] = model_side_label(i + 1);
+  add_buttons(gv, c, cells, labels, 2, ui_action_color(ACTION_NURSING), 0);
   show_sheet(gv);
 }
 

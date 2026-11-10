@@ -93,3 +93,40 @@ test('applyJob does not mutate the view it was given', () => {
   applyJob(start, { kind: 'timer_start', babyId: BABY, timerType: 'sleep', body: undefined }, ctx);
   assert.deepEqual(start, empty());
 });
+
+const nursing = (extra) => Object.assign({
+  id: 't1', type: 'nursing', started_at: '2026-10-24T18:50:00Z', paused: false, elapsed_seconds: 600,
+  side: 'left', left_seconds: 600, right_seconds: 0
+}, extra);
+const switchJob = (side) => ({ kind: 'timer_switch', babyId: BABY, timerType: 'nursing', body: { side } });
+
+test('switching sides keeps the one timer, banks the time so far and counts on the new side', () => {
+  const view = applyJob({ latest: {}, timers: [nursing()] }, switchJob('right'), ctx);
+  assert.equal(view.timers.length, 1);
+  const t = view.timers[0];
+  assert.deepEqual([t.id, t.side, t.left_seconds, t.right_seconds], ['t1', 'right', 600, 0]);
+  assert.equal(view.latest.nursing, undefined, 'nothing is logged by a switch');
+});
+
+test('switching to the side already running changes nothing', () => {
+  const start = { latest: {}, timers: [nursing()] };
+  assert.deepEqual(applyJob(start, switchJob('left'), ctx).timers, start.timers);
+});
+
+test('switching a paused feed resumes it', () => {
+  const view = applyJob({ latest: {}, timers: [nursing({ paused: true })] }, switchJob('right'), ctx);
+  assert.equal(view.timers[0].paused, false);
+  assert.equal(view.timers[0].side, 'right');
+});
+
+test('a switch with no nursing timer, or on a feed with no side, is ignored', () => {
+  assert.deepEqual(applyJob(empty(), switchJob('right'), ctx).timers, []);
+  const both = { latest: {}, timers: [nursing({ side: null })] };
+  assert.deepEqual(applyJob(both, switchJob('right'), ctx).timers, both.timers);
+});
+
+test('stopping after a switch saves the last side used', () => {
+  const switched = applyJob({ latest: {}, timers: [nursing()] }, switchJob('right'), ctx);
+  const stopped = applyJob(switched, { kind: 'timer_stop', babyId: BABY, timerType: 'nursing', body: undefined }, ctx);
+  assert.equal(stopped.latest.nursing.side, 'right');
+});

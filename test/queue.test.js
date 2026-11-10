@@ -450,3 +450,68 @@ test('the same instant written two ways still counts as the same timer', async (
   assert.equal(res.sent, 1);
   assert.deepEqual(res.superseded, []);
 });
+
+// ---- timer_switch ----
+
+const switchJob = (side, timerId) => ({
+  kind: 'timer_switch', babyId: BABY.id, timerType: 'nursing', body: timerId ? { side, timer_id: timerId } : { side }
+});
+const switchPosts = (h) => h.state.sent.filter((r) => r.method === 'POST' && r.url.endsWith('/timers/nursing/switch'));
+const startNursing = (h, side) => h.client.startTimer(BABY.id, 'nursing', { side }).then((r) => r.timer);
+
+test('a switch goes out as one request, naming the timer it was queued for', async () => {
+  const h = setup();
+  const timer = await startNursing(h, 'left');
+  h.clock.t += 5 * 60 * 1000;
+  h.queue.enqueue(switchJob('right', timer.id));
+  const res = await h.queue.flush(h.client);
+  assert.equal(res.sent, 1);
+  assert.deepEqual(JSON.parse(switchPosts(h)[0].body), { side: 'right', timer_id: timer.id });
+  const now = (await h.client.timers(BABY.id))[0];
+  assert.deepEqual([now.id, now.side, now.left_seconds], [timer.id, 'right', 300]);
+});
+
+test('a switch retried after a lost response is harmless: the side is already right', async () => {
+  const h = setup();
+  const timer = await startNursing(h, 'left');
+  h.queue.enqueue(switchJob('right', timer.id));
+  const realTransport = h.state.sent.length;
+  // The request reaches the server but the answer is lost: run it by hand, then flush the queued copy.
+  await h.client.switchSide(BABY.id, { side: 'right', timer_id: timer.id });
+  const res = await h.queue.flush(h.client);
+  assert.deepEqual({ sent: res.sent, dropped: res.dropped.length, stop: res.stop }, { sent: 1, dropped: 0, stop: null });
+  assert.ok(h.state.sent.length > realTransport);
+  assert.equal((await h.client.timers(BABY.id))[0].side, 'right');
+});
+
+test('a switch for a timer that has since been replaced is dropped and leaves the new timer alone', async () => {
+  const h = setup();
+  const old = await startNursing(h, 'left');
+  h.queue.enqueue(switchJob('right', old.id));
+  await h.client.stopTimer(BABY.id, 'nursing');
+  await startNursing(h, 'left');
+  const res = await h.queue.flush(h.client);
+  assert.equal(res.dropped.length, 1);
+  assert.equal(res.dropped[0].error.code, 'timer_changed');
+  assert.equal(h.queue.length(), 0);
+  assert.equal((await h.client.timers(BABY.id))[0].side, 'left');
+});
+
+test('a switch with nothing running, or on a feed with no side, is dropped rather than retried', async () => {
+  const h = setup();
+  h.queue.enqueue(switchJob('right'));
+  assert.equal((await h.queue.flush(h.client)).dropped[0].error.code, 'timer_not_running');
+  await startNursing(h, 'both');
+  h.queue.enqueue(switchJob('right'));
+  assert.equal((await h.queue.flush(h.client)).dropped[0].error.code, 'timer_has_no_side');
+  assert.equal(h.queue.length(), 0);
+});
+
+test('a late switch is not stamped by the phone: the server records the time', async () => {
+  const h = setup();
+  await startNursing(h, 'left');
+  h.queue.enqueue(switchJob('right'));
+  h.clock.t += 5 * 60 * 1000;
+  await h.queue.flush(h.client);
+  assert.deepEqual(JSON.parse(switchPosts(h)[0].body), { side: 'right' });
+});

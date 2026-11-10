@@ -370,7 +370,7 @@ test('stopping a timer someone else already stopped is treated as done', async (
   assert.equal(h.state().STATUS, P.STATUS.OK);
 });
 
-test('nursing: start on the left, switch to the right logs the left feed and runs the right', async () => {
+test('nursing: start on the left, switch to the right keeps one feed running with both sides', async () => {
   const h = harness();
   await h.app.start();
   await h.app.onMessage({ CMD: P.CMD.TIMER_START, CMD_ID: 1, ARG1: P.TIMER.NURSING, ARG2: P.SIDE.LEFT, ARG3: 0 });
@@ -382,8 +382,60 @@ test('nursing: start on the left, switch to the right logs the left feed and run
   assert.equal(s.TIMER_STATE[P.TIMER.NURSING], P.TIMER_STATE.RUNNING);
   assert.equal(s.TIMER_SIDE[P.TIMER.NURSING], P.SIDE.RIGHT);
   const server = JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/entries/latest?types=nursing`).body);
-  assert.equal(server.nursing.side, 'left');
-  assert.equal(server.nursing.duration_minutes, 8);
+  assert.equal(server.nursing, null, 'nothing is logged until the feed is stopped');
+  const timer = JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/timers`).body)[0];
+  assert.deepEqual([timer.side, timer.left_seconds], ['right', 8 * 60]);
+
+  h.clock.t += 4 * MIN;
+  await h.app.onMessage({ CMD: P.CMD.TIMER_STOP, CMD_ID: 3, ARG1: P.TIMER.NURSING, ARG2: 0, ARG3: 0 });
+  await h.app.idle();
+  const saved = JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/entries/latest?types=nursing`).body).nursing;
+  assert.equal(saved.duration_minutes, 12, 'one entry for the whole feed');
+  assert.deepEqual([saved.left_seconds, saved.right_seconds], [8 * 60, 4 * 60]);
+});
+
+test('a switch names the timer the watch was showing, so it cannot land on someone else\'s', async () => {
+  const h = harness();
+  const id = JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/timers/nursing/start`, { side: 'left' }).body).timer.id;
+  await h.app.start();
+  h.reset();
+  await h.app.onMessage({ CMD: P.CMD.TIMER_SWITCH, CMD_ID: 1, ARG1: P.SIDE.RIGHT });
+  await h.app.idle();
+  assert.deepEqual(JSON.parse(h.writes()[0].body), { side: 'right', timer_id: id });
+  assert.equal(h.state().TIMER_SIDE[P.TIMER.NURSING], P.SIDE.RIGHT);
+});
+
+test('a switch queued behind a still-unsent start names no timer yet (there is no id to give)', async () => {
+  const h = harness();
+  await h.app.start();
+  h.net.offline = true;
+  await h.app.onMessage({ CMD: P.CMD.TIMER_START, CMD_ID: 1, ARG1: P.TIMER.NURSING, ARG2: P.SIDE.LEFT, ARG3: 0 });
+  await h.app.onMessage({ CMD: P.CMD.TIMER_SWITCH, CMD_ID: 2, ARG1: P.SIDE.RIGHT });
+  await h.app.idle();
+  assert.equal(h.state().TIMER_SIDE[P.TIMER.NURSING], P.SIDE.RIGHT, 'shown at once');
+  h.net.offline = false;
+  h.reset(); // the offline attempts are recorded too
+  h.clock.t += 61 * 1000;
+  await h.app.onMessage({ CMD: P.CMD.REFRESH });
+  await h.app.idle();
+  assert.deepEqual(h.writes().map((w) => w.url.split('/').slice(-2).join('/')), ['nursing/start', 'nursing/switch']);
+  assert.deepEqual(JSON.parse(h.writes()[1].body), { side: 'right' });
+});
+
+test('a switch the server refuses because another device restarted the feed is dropped and the watch is told', async () => {
+  const h = harness();
+  h.api(`${BABY_PATH(PHOEBE)}/timers/nursing/start`, { side: 'left' });
+  await h.app.start();
+  // Another device stops the feed and starts a new one before the switch is sent.
+  h.api(`${BABY_PATH(PHOEBE)}/timers/nursing/stop`, {});
+  h.api(`${BABY_PATH(PHOEBE)}/timers/nursing/start`, { side: 'left' });
+  await h.app.onMessage({ CMD: P.CMD.TIMER_SWITCH, CMD_ID: 1, ARG1: P.SIDE.RIGHT });
+  await h.app.idle();
+  assert.equal(h.queued(), 0);
+  assert.ok(h.acks().some((a) => a.ACK_ID === 0 && a.ACK_STATUS === P.STATUS.REJECTED));
+  assert.equal(JSON.parse(h.api(`${BABY_PATH(PHOEBE)}/timers`).body)[0].side, 'left', 'the new feed is untouched');
+  await h.runScheduled();
+  assert.equal(h.state().TIMER_SIDE[P.TIMER.NURSING], P.SIDE.LEFT, 'the watch is corrected by the re-read');
 });
 
 test('pumping stop carries the amount in the chosen unit', async () => {

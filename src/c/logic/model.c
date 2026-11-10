@@ -22,6 +22,11 @@ bool model_timer_active(const WatchState *s, int timer) {
   return s->timer_state[timer] == TIMER_STATE_RUNNING || s->timer_state[timer] == TIMER_STATE_PAUSED;
 }
 
+bool model_can_switch_side(const WatchState *s) {
+  if (!model_timer_active(s, TIMER_NURSING)) return false;
+  return s->timer_side[TIMER_NURSING] == SIDE_LEFT || s->timer_side[TIMER_NURSING] == SIDE_RIGHT;
+}
+
 int32_t model_timer_elapsed(const WatchState *s, int timer, int32_t now) {
   if (!model_timer_active(s, timer)) return 0;
   int32_t e = s->timer_elapsed[timer];
@@ -61,8 +66,8 @@ const char *model_potty_label(int outcome) {
 }
 
 const char *model_side_label(int side) {
-  static const char *const t[] = { "", "Left", "Right", "Both" };
-  return pick(t, 4, side);
+  static const char *const t[] = { "", "Left", "Right" };
+  return pick(t, 3, side);
 }
 
 const char *model_bottle_type_label(int type) {

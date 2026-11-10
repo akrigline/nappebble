@@ -57,6 +57,12 @@ static void refresh(GridView *gv) {
 
   snprintf(gv->cells[CELL_CLOCK].l1, sizeof(gv->cells[CELL_CLOCK].l1), "%s", clock);
   snprintf(gv->cells[CELL_SUB].l1, sizeof(gv->cells[CELL_SUB].l1), "%s", l2);
+  // A feed another app started as "both" can only be stopped (the API refuses a switch), so say
+  // so rather than confirm a switch that would be dropped. Enabling changes hit targets: commit.
+  if (c->timer == TIMER_NURSING && gv->cells[CELL_SWITCH].enabled != model_can_switch_side(s)) {
+    gv->cells[CELL_SWITCH].enabled = !gv->cells[CELL_SWITCH].enabled;
+    grid_view_commit(gv);
+  }
   bool running = s->timer_state[c->timer] == TIMER_STATE_RUNNING;
   if (gv->tick_secs != (running ? 1 : 0)) grid_view_set_tick(gv, running ? 1 : 0);
   grid_view_redraw(gv);
@@ -75,6 +81,7 @@ static void on_tick(GridView *gv) {
 
 static void switch_side(GridView *gv) {
   const WatchState *s = comm_state();
+  if (!model_can_switch_side(s)) return;
   int other = s->timer_side[TIMER_NURSING] == SIDE_LEFT ? SIDE_RIGHT : SIDE_LEFT;
   char what[32];
   snprintf(what, sizeof(what), "Now %s", model_side_label(other));
@@ -117,6 +124,7 @@ void timer_view_open(int timer) {
   if (timer == TIMER_NURSING) {
     gv->cells[CELL_STOP].rect = (Rect){ 4, 168, SCREEN_W - 8, 54 };
     grid_view_add(gv, CELL_BUTTON, (Rect){ 4, 122, SCREEN_W - 8, 40 }, "Switch side", "", "", GColorBrilliantRose);
+    gv->cells[CELL_SWITCH].enabled = model_can_switch_side(comm_state());   // before the first commit
   }
   refresh(gv);
   grid_view_commit(gv);

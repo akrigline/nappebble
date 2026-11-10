@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Current. Matches the code at v0.1.0, which is in daily use on a Time 2 with the real nappi API. |
+| Status | Current. Matches the code at v0.2.0, which is in daily use on a Time 2 with the real nappi API. |
 | Last reviewed | 2026-11-03 |
 | Audience | Anyone changing the code: engineers and agents |
 | Read with | [PRODUCT.md](PRODUCT.md) (what the app does), [../AGENTS.md](../AGENTS.md) (how to work in the repo), [store-listing.md](store-listing.md) (release checklist) |
@@ -47,7 +47,7 @@ The watch never holds the token and never touches the network. Everything it sho
 
 | Concern | Choice |
 |---|---|
-| Platform | Pebble Time 2 only (`targetPlatforms: ["emery"]`), SDK 4.33.1, `pebble` tool 5.0.38 or newer |
+| Platform | Pebble Time 2 only (`targetPlatforms: ["emery"]`), SDK 4.44 (built and installed with it since 2026-11-10; 4.33.1 also built it before manifest v2), `pebble` tool 5.1.2 or newer |
 | Watch language | C, with SDK-free logic under `src/c/logic/` |
 | Phone language | JavaScript in PebbleKit JS, bundled by the SDK's webpack 1 (ES2015 syntax only) |
 | Settings UI | [Clay](https://github.com/pebble/clay) (`pebble-clay`), with a fresh instance per settings page |
@@ -66,10 +66,11 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 - `GET /babies/{id}/status` returns the running timers and the latest entries in one read (same data as `/timers` and `/entries/latest`). It is in the live OpenAPI spec but not in the 2026-10 snapshot in `/docs`.
 - **No edit or delete endpoints.** Solids and medication are read-only. This single fact is behind most of the app's caution (ADR-006, ADR-010).
 - Timers (sleep, nursing, pumping) are household-shared: another phone can start, pause or stop them. Start on a running timer returns 200 `already_running`. Stop on a stopped timer returns 409 `timer_not_running`. Timers carry `paused` and `elapsed_seconds`.
+- Timers carry an `id` (since 2026-11-08). `POST timers/nursing/switch` `{side, timer_id?}` moves the running feed to the other side and keeps it one entry; `pause` and `resume` exist for all three types (the app does not use them). They answer `{status, timer}` and the server stamps the time. With `timer_id`, a call touches only that timer (409 `timer_changed` otherwise). A feed started with side `both` has no side and can only be stopped (409 `timer_has_no_side`). Switching to the side already running is a no-op (`already_on_side`); switching a paused feed resumes it. Stopping a paused timer saves it as of the pause.
 - A Stop names no timer (no id, no `started_at` precondition, no idempotency key): it stops whatever timer of that type is running. A timer's `started_at` is the only identity it has (ADR-021).
 - Times must be ISO 8601 with an offset. Amounts are millilitres unless `unit: "oz"` is sent; latest-entry responses always report ml. Nursing `side: both` is valid only when starting a timer. A logged nursing entry needs durations, so live nursing goes through timers.
-- Error bodies are `{"error": {"code", "message"}}`. Codes the docs name: `unauthorized`, `token_expired`, `premium_required`, `timer_not_running`. The docs give no code for 429 or 404, so the client branches on HTTP status.
-- Calls the app makes: `GET /v1/babies`, `GET /v1/babies/{id}/status?types=...` (active baby), `GET /v1/babies/{id}/timers` (other babies, and the Stop check in ADR-021), `POST /v1/babies/{id}/entries`, `POST /v1/babies/{id}/timers/{sleep|nursing|pumping}/start|stop`.
+- Error bodies are `{"error": {"code", "message"}}`. Codes the docs name: `unauthorized`, `token_expired`, `premium_required`, `timer_not_running`, and for the timer calls that take a `timer_id`, `timer_changed` and `timer_has_no_side`. The docs give no code for 429 or 404, so the client branches on HTTP status.
+- Calls the app makes: `GET /v1/babies`, `GET /v1/babies/{id}/status?types=...` (active baby), `GET /v1/babies/{id}/timers` (other babies, and the Stop check in ADR-021), `POST /v1/babies/{id}/entries`, `POST /v1/babies/{id}/timers/{sleep|nursing|pumping}/start|stop`, `POST /v1/babies/{id}/timers/nursing/switch`.
 - The assumptions the mock had to make because the docs are silent are listed at the top of `test/support/mock-nappi.js`. Real-API behaviour that contradicts one of them is a bug in the mock first.
 
 ### 3.2 Pebble platform
@@ -92,7 +93,7 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 | `api.js` | nappi client. Takes a `transport(req) -> Promise<{status, headers, body}>`. Maps error bodies to `ApiError {code, status, retryAfter}`. |
 | `xhr-transport.js` | Transport over XHR with its own watchdog (ADR-008 note), since the emulator's XHR can hang silently. |
 | `queue.js` | Durable, ordered write queue with idempotency keys, late-delivery stamping, the check that a late or retried Stop still has its timer (ADR-021), and the rules for what is retried, dropped or done. |
-| `commands.js` | Pure: watch command dict to queue jobs (`entry`, `timer_start`, `timer_stop`). Validates ranges, throws `BadCommand`. |
+| `commands.js` | Pure: watch command dict to queue jobs (`entry`, `timer_start`, `timer_stop`, `timer_switch`). Validates ranges, throws `BadCommand`. |
 | `optimistic.js` | Pure: predicts what a queued job will look like in the cache so the watch can show it at once. |
 | `state.js` | Pure: cache + settings to the compact `STATE` dict (epoch seconds and small enums; the watch formats text). |
 | `protocol.js` | **Source of truth** for enums, command ids, status codes and the AppMessage key list. |
@@ -138,7 +139,7 @@ Source of truth: `https://api.nappi.app/v1/openapi.json` and <https://nappi.app/
 
 1. Tap on a sheet button calls `ui_send(...)`. It refuses if a command is already in flight ("Still sending") or the action is inside its 1.5 s lockout, then `comm_send`s and shows "Sending...".
 2. `comm.c` holds the command until the ready gate opens, then hands it to AppMessage (retrying a busy or NACKing outbox, never a timed-out send).
-3. Phone `write()` checks token, baby and `BABY_KEY`, turns the command into jobs (`commands.js`), enqueues them (each gets a UUID key and `queuedAt`; a Stop also records the timer it was for, ADR-021), applies them optimistically to the cache, then sends **`ACK` first, then `STATE`** (whose `PENDING` already counts the new write), then flushes the queue in the background.
+3. Phone `write()` checks token, baby and `BABY_KEY`, turns the command into jobs (`commands.js`), enqueues them (each gets a UUID key and `queuedAt`; a Stop also records the timer it was for, ADR-021, and a Switch names it by id, ADR-023), applies them optimistically to the cache, then sends **`ACK` first, then `STATE`** (whose `PENDING` already counts the new write), then flushes the queue in the background.
 4. The watch shows the checkmark and vibrates **only on the ACK**. Delivery to nappi happens afterwards; the ACK means "safely queued on the phone".
 5. After the flush the phone schedules one debounced re-read (4 s) and sends a final `STATE`.
 
@@ -146,7 +147,7 @@ If no ACK arrives within 6 s, or AppMessage gives up after the send, the watch s
 
 ### 5.3 Timers
 
-Start and stop are queue jobs like any write. The watch ticks the clock locally from `TIMER_ELAPSED` + `TIMER_AT`; the phone rolls elapsed seconds forward by the time since its snapshot (paused timers are not rolled). Switch side is a stop followed by a start on the other side (ADR-010). A refresh reconciles with whatever other devices did.
+Start and stop are queue jobs like any write. The watch ticks the clock locally from `TIMER_ELAPSED` + `TIMER_AT`; the phone rolls elapsed seconds forward by the time since its snapshot (paused timers are not rolled). Switch side is one `timer_switch` job that keeps the feed a single entry (ADR-023). A refresh reconciles with whatever other devices did.
 
 ### 5.4 Refresh and the read budget
 
@@ -158,7 +159,7 @@ Nothing polls in the background. Reads happen on launch, at most once a minute w
 
 - **Settings** (`nappebble.settings`): token, babyId, bottleUnits, pumpUnits, baseUrl, layout (ordered action names, Status appended by `state.js`), defaultBottleType, exitAfterLog. The token never goes to the watch.
 - **Cache** (`nappebble.cache`): babies; per baby `latest`, `timers`, `timersAt`, `fetchedAt` (older caches also hold an unused `etag`); and `others` (whether another baby has a running timer). Cleared when the token changes. Queued writes are laid back over every read (ADR-012).
-- **Queue** (`nappebble.queue`): array of `{kind, babyId, body, timerType?, key, queuedAt, startedAt?, attempts?}`, strictly ordered. The first job that cannot be delivered holds the rest back. `startedAt` and `attempts` exist only on `timer_stop` jobs (ADR-021); a job without them is delivered as before.
+- **Queue** (`nappebble.queue`): array of `{kind, babyId, body, timerType?, key, queuedAt, startedAt?, attempts?}`, strictly ordered. The first job that cannot be delivered holds the rest back. `startedAt` and `attempts` exist only on `timer_stop` jobs (ADR-021), and `timer_switch` jobs carry `timer_id` in `body` (ADR-023); a job without them is delivered as before.
 
 ### 6.2 Watch
 
@@ -272,7 +273,7 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 
 ### ADR-010: Timer semantics follow what the API can do
 
-- Status: Accepted (2026-10-24; swipe removed 2026-10-28)
+- Status: Accepted (2026-10-24; swipe removed 2026-10-28). The Switch side decision is superseded by ADR-023 (2026-11-08); the rest stands.
 - Context: The API cannot change a running timer's side or start time and has no delete.
 - Decision: "Switch side" is a stop followed by a start on the other side, so one feed becomes two nursing entries. Backdating is offered only when starting, never on a running timer. The spec's swipe-to-switch was removed because a stray swipe would create two undeletable entries; only the Switch side button does it. Paused timers (which the original spec ignored) show "Paused" with the clock frozen and are not rolled forward. Stopping needs the timer screen's Stop button, never one tap from Home.
 - Consequences: The nursing history shows per-side entries. The Stop retried after a lost response could stop a timer another device has just started (section 10).
@@ -370,6 +371,30 @@ Format: **Status** (Accepted, or Superseded by ADR-nnn), **Context**, **Decision
 - Decision: `STATE` carries `BABY_KEY`, a 31-bit FNV-1a hash of the active baby's whole id (never 0). The watch stores it in `WatchState.baby_key` and sends it with every command. `write()` refuses (`WRONG_BABY`, then a fresh `STATE`) any write whose key is missing or is not the active baby's. `BABY_INDEX` stays in `STATE` for the switcher but is no longer sent back. The whole id is hashed because time-ordered ids share their leading digits.
 - Consequences: `WatchState` grew by 4 bytes, so `PERSIST_VERSION` is 3 and a watch upgraded from 2 starts without its cached state until the phone sends one. A watch that has been shown no baby cannot log anything. A hash collision between two babies of one household is possible in principle (about 1 in 2^31) and would let a write through to the wrong one. `SWITCH_BABY` still takes a list position, which the visible baby name makes self-correcting.
 - Code: `babies.js` `babyKey`, `state.js`, `app.js` `write`, `comm.c`, `logic/model.h`, `protocol.js`.
+
+### ADR-023: Switch side is the API's switch call, pinned to the timer by id
+
+- Status: Accepted (2026-11-08). Supersedes the Switch side part of ADR-010.
+- Context: nappi added `POST timers/nursing/switch` and a `timer_id` on every timer. The old stop-then-start split one feed into two undeletable entries, and a retried stop could hit another device's timer (ADR-021).
+- Decision: `TIMER_SWITCH` becomes one `timer_switch` job `{side, timer_id?}`. `app.js` `tiedToTimer` adds the `timer_id` of the timer the watch was showing, with the same rule as ADR-021: only one the server reported, so a switch queued behind a Start that has not been sent names no timer and acts on whichever feed is running. No check read is needed, because the server refuses a switch for a replaced timer (409 `timer_changed`) and a repeat after a lost response is a no-op (`already_on_side`). Any 4xx is dropped like other writes, so `timer_changed`, `timer_not_running` and `timer_has_no_side` end up as a rejection to the watch and a re-read; none is retried. The phone adds no time to a switch (the server stamps it), so a switch delivered late credits the elapsed time to the side it was on. `optimistic.js` moves the side at once, banks the time so far on the old side and resumes a paused feed. The watch greys out Switch side when `model_can_switch_side` is false (no feed, or one another app started as "both"), so it does not confirm a switch the API would refuse.
+- Consequences: A switched feed is one nursing entry with both sides' times. A "both" feed (see ADR-024) can only be stopped; before, Switch side stopped it and started a fresh one. Pause and resume are available in the API but not used (no UI for them yet). The mock's assumptions about the switch are listed at the top of `mock-nappi.js`; the real API has not been exercised by this change.
+- Code: `commands.js`, `api.js` `switchSide`, `queue.js`, `app.js` `tiedToTimer`, `optimistic.js` `switchTimer`, `logic/model.c` `model_can_switch_side`, `timer_view.c`.
+
+### ADR-024: No "Both" when starting a feed
+
+- Status: Accepted (2026-11-08).
+- Context: The start sheet had a full-width **Both**, which starts a nursing timer with no side (`side: null`). A feed with no side cannot be switched, paused or resumed (409 `timer_has_no_side`), only stopped. With Switch side now keeping one entry (ADR-023), "Both" bought nothing that Left plus Switch side does not do better, and it was the one way to start a feed the app could not then switch.
+- Decision: The nursing start sheet offers Left and Right only, as two large buttons. `SIDE_BOTH` is gone from the protocol (`protocol.js`, `protocol.h`) and `commands.js` rejects a nursing start whose side is anything but none, left or right. The Switch side button stays greyed out for a feed with no side, because another app or caregiver can still start one.
+- Consequences: A feed on both breasts is started on one and switched, so the entry carries the time on each. The API and the mock still accept `both`; only this app no longer sends it. The side label for value 3 is now "?" rather than "Both".
+- Code: `sheets.c` `sheet_nursing_start`, `commands.js`, `protocol.js`, `logic/protocol.h`, `logic/model.c`.
+
+### ADR-025: Declare the Internet permission for api.nappi.app (manifest v2)
+
+- Status: Accepted (2026-11-10).
+- Context: SDK 4.44 builds `manifestVersion: 2` pbws by default. The phone app gives a v2 app only what `usesPermissions` declares, so PebbleKit JS without it cannot make network requests (the request fails with `PERMISSION_DENIED`). A v1 pbw is treated as a legacy app with unrestricted access, but is ignored for permissions and is on its way out. The emulator only logs what the phone would refuse, so it cannot catch a missing declaration.
+- Decision: `package.json#pebble.usesPermissions` declares one `Internet` entry with `domains: ["api.nappi.app"]`. A declared domain covers its subdomains. No `manifestVersion: 1`.
+- Consequences: A custom API address in Clay (mock server, localhost, private network) is refused by the phone for any host not declared; `LocalNetwork` is not declared. The mock workflow therefore works in the emulator only, which logs rather than blocks. Verified on a real phone (2026-11-10, v0.2.0, Core Devices app): logging reaches the API and the Clay settings page (a `data:` URL via `Pebble.openURL`) opens and saves under v2.
+- Code: `package.json`.
 
 ## 9. Rules for changing the code
 

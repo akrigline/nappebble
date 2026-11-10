@@ -332,11 +332,17 @@ function createApp(deps) {
   // queue can tell if it has been replaced by the time the Stop is delivered. Only a timer the
   // server reported will do: one this phone guessed at (a Start still waiting in the queue)
   // gets a start time of the server's choosing.
+  //
+  // A Switch can say: the API takes the timer's id, so the server refuses (409 timer_changed) a
+  // switch for a timer that is no longer the one running, with no check of ours needed.
   function tiedToTimer(job, per) {
-    if (job.kind !== 'timer_stop') return job;
+    if (job.kind !== 'timer_stop' && job.kind !== 'timer_switch') return job;
     const waitingStart = queue.all().some((q) => q.kind === 'timer_start' && q.babyId === job.babyId && q.timerType === job.timerType);
     const shown = per.timers.find((t) => t.type === job.timerType);
     if (waitingStart || !shown || shown.pending) return job;
+    if (job.kind === 'timer_switch') {
+      return shown.id ? Object.assign({}, job, { body: Object.assign({}, job.body, { timer_id: shown.id }) }) : job;
+    }
     return Object.assign({}, job, { startedAt: shown.started_at });
   }
 

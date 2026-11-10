@@ -128,6 +128,13 @@ function createClient(options) {
 
     stopTimer(babyId, type, body) {
       return request('POST', baby(babyId) + '/timers/' + type + '/stop', { body }).then(value);
+    },
+
+    // Moves the running nursing timer to { side, timer_id? }, so one feed stays one entry. The
+    // server stamps the time. A repeat is harmless (already_on_side), and with timer_id it
+    // cannot touch a timer other than the one named (409 timer_changed).
+    switchSide(babyId, body) {
+      return request('POST', baby(babyId) + '/timers/nursing/switch', { body }).then(value);
     }
   };
 }

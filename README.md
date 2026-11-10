@@ -35,7 +35,7 @@ Home grid, second page, Diaper, Bottle and the nursing timer, from the Emery emu
 ```sh
 npm ci
 npm test                           # JS tests then host-side C tests; no Pebble tooling needed
-pebble clean && pebble build       # emery .pbw (SDK 4.33.1)
+pebble clean && pebble build       # emery .pbw (SDK 4.44)
 SEED=1 TWO_BABIES=1 npm run mock   # fake nappi API on http://127.0.0.1:4010
 pebble install --emulator emery
 ```

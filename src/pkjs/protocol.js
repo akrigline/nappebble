@@ -39,7 +39,7 @@ const ACTION = Object.freeze({
 //   TIMER_START   ARG1 TIMER_*, ARG2 SIDE_*, ARG3 minutes ago
 //   TIMER_STOP    ARG1 TIMER_*, ARG2 SIDE_* override (0 none), ARG3 pumped amount x10 (0 none),
 //                 ARG4 UNITS_* the amount is in (absent or invalid: the saved pump units)
-//   TIMER_SWITCH  ARG1 new SIDE_* (stop the nursing timer, start the other side)
+//   TIMER_SWITCH  ARG1 new SIDE_* (the API's switch call: the running feed moves to that side)
 //   REFRESH       ARG1 1 to bypass the once-a-minute throttle (the Status sheet's button)
 //   SWITCH_BABY   ARG1 baby index
 //   SET_UNITS     ARG1 UNITS_SCREEN_*, ARG2 UNITS_* (the unit that screen shows and logs in)
@@ -71,7 +71,7 @@ const TIMER = Object.freeze({ SLEEP: 0, NURSING: 1, PUMPING: 2 });
 const TIMER_TYPES = ['sleep', 'nursing', 'pumping'];
 const TIMER_STATE = Object.freeze({ NONE: 0, RUNNING: 1, PAUSED: 2 });
 
-const SIDE = Object.freeze({ NONE: 0, LEFT: 1, RIGHT: 2, BOTH: 3 });
+const SIDE = Object.freeze({ NONE: 0, LEFT: 1, RIGHT: 2 });
 const UNITS = Object.freeze({ OZ: 0, ML: 1 });
 const UNITS_SCREEN = Object.freeze({ BOTTLE: 0, PUMP: 1 });
 

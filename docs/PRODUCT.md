@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Current. Describes what the code does at v0.1.0, in daily use. |
+| Status | Current. Describes what the code does at v0.2.0, in daily use. |
 | Last reviewed | 2026-10-29 |
 | Audience | Anyone who needs to know what the app does and what it will not do: product, support, store copy, engineers |
 | Read with | [ARCHITECTURE.md](ARCHITECTURE.md) (how and why it is built), [store-listing.md](store-listing.md) (store copy), [../AGENTS.md](../AGENTS.md) |
@@ -86,9 +86,9 @@ The app is an independent project by its developer, not made or supported by nap
   - Banner text: "Sleeping 1h 12m", "Nursing L 12m", "Pumping 5m"; "... paused ..." for paused timers.
   - The timer screen shows a large `m:ss` (or `h:mm:ss`) clock that ticks every second while running and freezes while paused, plus a **Stop** button. Nursing also has **Switch side**.
   - **Stop** on sleep and nursing logs the entry at once and returns Home. **Stop** on a pump timer opens the pump amount screen (F-07). Stopping is never a single tap from Home.
-  - **Switch side** stops the nursing timer and starts it on the other side, so a feed becomes two nursing entries (ARCHITECTURE.md ADR-010). There is deliberately no swipe to switch.
+  - **Switch side** moves the running nursing timer to the other side. The feed stays one nursing entry, with the time on each side (ARCHITECTURE.md ADR-023). It is greyed out for a feed that has no side (one started as "both" from another app), which can only be stopped. There is deliberately no swipe to switch.
   - The screen closes itself if the timer ends elsewhere (another phone, another caregiver).
-- **nappi call:** `POST timers/{type}/stop`, and for Switch side a stop followed by `POST timers/nursing/start`.
+- **nappi call:** `POST timers/{type}/stop`, and for Switch side `POST timers/nursing/switch` `{side, timer_id}`.
 - **Limits:** A running timer's start time cannot be changed (the API cannot); backdating is only offered when starting. Timers are shared with everyone in the household, so they can change under you; the app reconciles on each refresh.
 
 ### F-03: Diaper
@@ -108,9 +108,9 @@ The app is an independent project by its developer, not made or supported by nap
 ### F-05: Nursing
 
 - **Summary:** Time a nursing session by side.
-- **How it works:** Idle: tap **Nursing**. The start sheet shows the time strip, then **Left** and **Right** side by side, then a full-width **Both**. Choosing one starts the timer (confirmation "Nursing ..."). Running: the tile and banner show the side and elapsed time; tap to open the timer screen (F-02) to Stop or Switch side. The tile's detail line when idle is the last side used.
+- **How it works:** Idle: tap **Nursing**. The start sheet shows the time strip, then **Left** and **Right** as two large buttons side by side. Choosing one starts the timer (confirmation "Nursing ..."). Running: the tile and banner show the side and elapsed time; tap to open the timer screen (F-02) to Stop or Switch side. The tile's detail line when idle is the last side used.
 - **nappi call:** `POST timers/nursing/start` `{side, start_time?}`; `POST timers/nursing/stop`.
-- **Limits:** Nursing is timer-only because nappi needs durations for a logged nursing entry. The side cannot be changed on a running timer; Switch side makes two entries. "Both" exists only when starting.
+- **Limits:** Nursing is timer-only because nappi needs durations for a logged nursing entry. Switch side keeps one entry. There is no "Both" (ARCHITECTURE.md ADR-024); a feed another app started as "both" has no side, so it can only be stopped here.
 
 ### F-06: Sleep
 
@@ -253,7 +253,7 @@ Sheets (Diaper, Potty, Bottle, Nursing start, Sleep/Pump start, Pump "How much?"
 | Solids, medication, growth | Not supported | Solids and medication are read-only in the API; growth is not wanted on a watch. |
 | Activity logging | Removed (was in the first spec) | Cut to keep the screen small. A saved layout that still lists it is tolerated. See ARCHITECTURE.md ADR-018. |
 | Bottle presets and the Custom amount screen | Replaced by the amount strip (F-10) | One control instead of six buttons plus a screen. |
-| Swipe on the nursing timer to switch side | Removed on purpose | A stray swipe would create two undeletable entries. |
+| Swipe on the nursing timer to switch side | Removed on purpose | A stray swipe would switch sides by accident, and a switch cannot be undone except by switching back. |
 | Backdate a running timer | Not possible | The API cannot change a running timer's start. |
 | Voice entry, watchface, "log for both babies" | Not planned | Out of scope for v1. |
 | Other bottle types (tube, cow, goat, soy, other) | Not offered | Only formula and breast milk are on the watch. |

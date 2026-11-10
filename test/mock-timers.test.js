@@ -238,3 +238,93 @@ test('status needs a token and a known baby', () => {
   const { api } = setup();
   assert.equal(api.get('/v1/babies/nope/status').status, 404);
 });
+
+// ---- ids and switching sides (nappi API, 2026-11-08) ----
+
+const SWITCH = `${TIMERS}/nursing/switch`;
+
+test('timers carry an id, and it stays the same while the timer runs', () => {
+  const { api, clock } = setup();
+  const started = api.post(`${TIMERS}/nursing/start`, { side: 'left' }).json.timer;
+  assert.match(started.id, /^[0-9a-f-]{36}$/);
+  clock.t += 5 * MIN;
+  assert.equal(api.get(TIMERS).json[0].id, started.id);
+  api.post(`${TIMERS}/nursing/stop`, {});
+  assert.notEqual(api.post(`${TIMERS}/nursing/start`, { side: 'left' }).json.timer.id, started.id);
+});
+
+test('switching moves the feed to the other side and keeps the time on the side it was on', () => {
+  const { api, clock } = setup();
+  const id = api.post(`${TIMERS}/nursing/start`, { side: 'left' }).json.timer.id;
+  clock.t += 8 * MIN;
+  const res = api.post(SWITCH, { side: 'right', timer_id: id });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.status, 'switched');
+  assert.equal(res.json.timer.id, id, 'still one timer');
+  assert.equal(res.json.timer.side, 'right');
+  assert.equal(res.json.timer.left_seconds, 8 * 60);
+  assert.equal(res.json.timer.right_seconds, 0);
+  clock.t += 3 * MIN;
+  const now = api.get(TIMERS).json[0];
+  assert.deepEqual([now.elapsed_seconds, now.left_seconds, now.right_seconds], [11 * 60, 8 * 60, 3 * 60]);
+});
+
+test('a switched feed is one nursing entry with both sides, ending on the last side used', () => {
+  const { api, clock } = setup();
+  api.post(`${TIMERS}/nursing/start`, { side: 'left' });
+  clock.t += 8 * MIN;
+  api.post(SWITCH, { side: 'right' });
+  clock.t += 4 * MIN;
+  const stopped = api.post(`${TIMERS}/nursing/stop`, {}).json.entry;
+  assert.equal(stopped.duration_minutes, 12);
+  assert.equal(stopped.side, 'right');
+  const latest = api.get(LATEST + '?types=nursing').json.nursing;
+  assert.equal(latest.left_seconds, 8 * 60);
+  assert.equal(latest.right_seconds, 4 * 60);
+});
+
+test('switching to the side already running changes nothing', () => {
+  const { api, clock } = setup();
+  api.post(`${TIMERS}/nursing/start`, { side: 'left' });
+  clock.t += 2 * MIN;
+  const res = api.post(SWITCH, { side: 'left' });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.status, 'already_on_side');
+  assert.equal(res.json.timer.left_seconds, 2 * 60);
+});
+
+test('switching a paused feed resumes it on the new side', () => {
+  const { api, clock, mock } = setup();
+  api.post(`${TIMERS}/nursing/start`, { side: 'left' });
+  clock.t += 5 * MIN;
+  mock.pauseTimer(BABY.id, 'nursing');
+  clock.t += 10 * MIN;
+  const res = api.post(SWITCH, { side: 'right' });
+  assert.equal(res.json.status, 'switched');
+  assert.equal(res.json.timer.paused, false);
+  assert.equal(res.json.timer.side, 'right');
+  assert.equal(res.json.timer.elapsed_seconds, 5 * 60, 'the pause is not counted');
+  assert.equal(res.json.timer.left_seconds, 5 * 60);
+});
+
+test('switch errors: nothing running, a different timer, a feed with no side, bad input', () => {
+  const { api } = setup();
+  const none = api.post(SWITCH, { side: 'right' });
+  assert.equal(none.status, 409);
+  assert.equal(none.json.error.code, 'timer_not_running');
+
+  const id = api.post(`${TIMERS}/nursing/start`, { side: 'both' }).json.timer.id;
+  const noSide = api.post(SWITCH, { side: 'right', timer_id: id });
+  assert.equal(noSide.status, 409);
+  assert.equal(noSide.json.error.code, 'timer_has_no_side');
+
+  api.post(`${TIMERS}/nursing/stop`, {});
+  api.post(`${TIMERS}/nursing/start`, { side: 'left' });
+  const changed = api.post(SWITCH, { side: 'right', timer_id: id });
+  assert.equal(changed.status, 409);
+  assert.equal(changed.json.error.code, 'timer_changed');
+  assert.equal(api.get(TIMERS).json[0].side, 'left', 'a rejected switch changes nothing');
+
+  assert.equal(api.post(SWITCH, {}).status, 400, 'side is required');
+  assert.equal(api.post(SWITCH, { side: 'both' }).status, 400, 'both is for starting only');
+});

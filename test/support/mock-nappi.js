@@ -13,8 +13,11 @@
 //  - a default sleep_type is "night" for starts between 19:00 and 07:00 local
 //  - a POST without a JSON Content-Type is 415 `unsupported_media_type` (the status is
 //    observed on timer stop; the error code is a guess)
+//  - switching (2026-11-08): the stop entry's side is the last side used; with no timer running a
+//    switch answers timer_not_running even when it names a timer_id; switching a paused feed to the
+//    side it was already on resumes it ("switched"); a body without a valid side is 400 invalid_request
 // Codes the docs DO name: unauthorized, token_expired, premium_required,
-// timer_not_running.
+// timer_not_running, timer_changed, timer_has_no_side.
 
 const crypto = require('node:crypto');
 
@@ -261,18 +264,29 @@ function createMockNappi(options) {
 
   function timerJson(type, timer) {
     const out = {
+      id: timer.id,
       type,
       started_at: iso(timer.start),
       paused: timer.pausedAt !== null,
       elapsed_seconds: elapsedSeconds(timer),
     };
     if (type === 'nursing') {
-      const e = out.elapsed_seconds;
+      const sides = sideSeconds(timer, out.elapsed_seconds, timer.side);
       out.side = timer.side;
-      out.left_seconds = timer.side === 'left' ? e : 0;
-      out.right_seconds = timer.side === 'right' ? e : 0;
+      out.left_seconds = sides.left;
+      out.right_seconds = sides.right;
     }
     return out;
+  }
+
+  // Seconds per side: what earlier switches banked, plus what the current side has run since.
+  // `onSide` is the side the open stretch counts for (a stop can override it).
+  function sideSeconds(timer, elapsed, onSide) {
+    const open = Math.max(0, elapsed - timer.stretchFrom);
+    return {
+      left: timer.banked.left + (onSide === 'left' ? open : 0),
+      right: timer.banked.right + (onSide === 'right' ? open : 0),
+    };
   }
 
   function bodyOf(req) {
@@ -302,7 +316,7 @@ function createMockNappi(options) {
       const given = oneOf(body.side, ['left', 'right', 'both'], 'side');
       side = given === 'both' ? null : given;
     }
-    d.timers[type] = { start, side, pausedAt: null, pausedTotal: 0 };
+    d.timers[type] = { id: nextId(), start, side, pausedAt: null, pausedTotal: 0, banked: { left: 0, right: 0 }, stretchFrom: 0 };
     return respond(201, { status: 'started', timer: timerJson(type, d.timers[type]) });
   }
 
@@ -328,9 +342,10 @@ function createMockNappi(options) {
       entry = { type, time: timer.start, start: timer.start, end, sortKey: end, duration_minutes: minutes, sleep_type: defaultSleepType(timer.start, baby) };
     } else if (type === 'nursing') {
       side = sideOverride || timer.side;
+      const sides = sideSeconds(timer, seconds, side);
       entry = {
         type, time: timer.start, sortKey: timer.start, duration_minutes: minutes, side,
-        left_seconds: side === 'left' ? seconds : 0, right_seconds: side === 'right' ? seconds : 0,
+        left_seconds: sides.left, right_seconds: sides.right,
       };
     } else {
       entry = {
@@ -345,6 +360,31 @@ function createMockNappi(options) {
     if (type === 'sleep') out.sleep_type = entry.sleep_type;
     if (type === 'nursing') out.side = side;
     return respond(200, { status: 'stopped', entry: out });
+  }
+
+  function switchSide(baby, body) {
+    const side = oneOf(body.side, ['left', 'right'], 'side');
+    if (body.timer_id !== undefined && typeof body.timer_id !== 'string') throw new Invalid('timer_id must be a string');
+    const timer = data.get(baby.id).timers.nursing;
+    if (!timer) return fail(409, 'timer_not_running', 'No nursing timer is running');
+    if (body.timer_id !== undefined && body.timer_id !== timer.id) {
+      return fail(409, 'timer_changed', 'That nursing timer is not the one running now');
+    }
+    if (timer.side === null) return fail(409, 'timer_has_no_side', 'This feed was started with both sides, so it can only be stopped');
+
+    const paused = timer.pausedAt !== null;
+    if (timer.side === side && !paused) return respond(200, { status: 'already_on_side', timer: timerJson('nursing', timer) });
+
+    const elapsed = elapsedSeconds(timer);
+    const open = sideSeconds(timer, elapsed, timer.side);
+    timer.banked = { left: open.left, right: open.right };
+    timer.stretchFrom = elapsed;
+    timer.side = side;
+    if (paused) {
+      timer.pausedTotal += now() - timer.pausedAt;
+      timer.pausedAt = null;
+    }
+    return respond(200, { status: 'switched', timer: timerJson('nursing', timer) });
   }
 
   function timersOf(baby) {
@@ -406,6 +446,10 @@ function createMockNappi(options) {
         const body = bodyOf(req);
         return action === 'start' ? startTimer(baby, type, body) : stopTimer(baby, type, body);
       },
+    },
+    {
+      method: 'POST', pattern: new RegExp('^' + BABY + '\\/timers\\/nursing\\/switch$'), kind: 'write',
+      run: (req, url, baby) => switchSide(baby, bodyOf(req)),
     },
   ];
 

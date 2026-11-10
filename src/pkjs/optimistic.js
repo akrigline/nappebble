@@ -105,11 +105,30 @@ function stopTimer(view, job, ctx) {
   }
 }
 
+// What the server does for a switch: the time so far stays with the side it was on, the new
+// side counts from now, and a paused feed carries on. A feed with no side (started with
+// "both" by another app) cannot be switched; the server refuses it and the next read corrects the view.
+function switchTimer(view, job) {
+  const timer = view.timers.find((t) => t.type === job.timerType);
+  if (!timer || !timer.side) return;
+  const side = job.body.side;
+  if (timer.side === side && !timer.paused) return;
+  const was = timer.side;
+  const other = was === 'left' ? 'right' : 'left';
+  // `elapsed_seconds` is rolled forward by the phone; the per-side totals are not, so the side
+  // that was running is whatever the feed has run beyond the other side's total.
+  const next = Object.assign({}, timer, { side, paused: false });
+  next[other + '_seconds'] = timer[other + '_seconds'] || 0;
+  next[was + '_seconds'] = Math.max(0, timer.elapsed_seconds - next[other + '_seconds']);
+  view.timers = view.timers.map((t) => (t === timer ? next : t));
+}
+
 function applyJob(view, job, ctx) {
   const next = { latest: Object.assign({}, view.latest), timers: view.timers.slice() };
   if (job.kind === 'entry') applyEntry(next, job.body, ctx);
   else if (job.kind === 'timer_start') startTimer(next, job, ctx);
   else if (job.kind === 'timer_stop') stopTimer(next, job, ctx);
+  else if (job.kind === 'timer_switch') switchTimer(next, job);
   return next;
 }
 

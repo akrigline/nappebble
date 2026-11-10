@@ -48,6 +48,7 @@ void model_default(WatchState *s);
 
 int32_t model_timer_elapsed(const WatchState *s, int timer, int32_t now);
 bool model_timer_active(const WatchState *s, int timer);   // running or paused
+bool model_can_switch_side(const WatchState *s);           // a nursing feed that has a side (one started as "both" elsewhere has none)
 int model_timer_for_action(int action);                    // -1 if none
 
 const char *model_action_title(int action);

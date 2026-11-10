@@ -51,7 +51,6 @@ function unitName(dict, saved) {
 function sideName(side) {
   if (side === P.SIDE.LEFT) return 'left';
   if (side === P.SIDE.RIGHT) return 'right';
-  if (side === P.SIDE.BOTH) return 'both';
   return null;
 }
 
@@ -97,7 +96,11 @@ function jobsFor(dict, ctx) {
     case P.CMD.TIMER_START: {
       const type = timerType(int(dict, 'ARG1'));
       const body = {};
-      const side = sideName(int(dict, 'ARG2', 0));
+      const sideArg = int(dict, 'ARG2', 0);
+      if (type === 'nursing' && sideArg !== P.SIDE.NONE && sideArg !== P.SIDE.LEFT && sideArg !== P.SIDE.RIGHT) {
+        throw new BadCommand('nursing side must be left or right');
+      }
+      const side = sideName(sideArg);
       if (type === 'nursing' && side) body.side = side;
       const m = minutes(dict, 'ARG3');
       if (m > 0) body.start_time = timeAgo(m);
@@ -123,10 +126,7 @@ function jobsFor(dict, ctx) {
     case P.CMD.TIMER_SWITCH: {
       const side = int(dict, 'ARG1');
       if (side !== P.SIDE.LEFT && side !== P.SIDE.RIGHT) throw new BadCommand('switch needs left or right');
-      return [
-        timerJob('timer_stop', 'nursing', undefined),
-        timerJob('timer_start', 'nursing', { side: sideName(side) })
-      ];
+      return [timerJob('timer_switch', 'nursing', { side: sideName(side) })];
     }
 
     default:

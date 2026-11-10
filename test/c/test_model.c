@@ -57,6 +57,22 @@ TEST(timer_active_means_running_or_paused) {
   CHECK(!model_timer_active(&s, 9));
 }
 
+TEST(switch_side_needs_a_nursing_feed_that_has_a_side) {
+  WatchState s = fresh();
+  CHECK(!model_can_switch_side(&s));                       // nothing running
+  s.timer_state[TIMER_NURSING] = TIMER_STATE_RUNNING;
+  s.timer_side[TIMER_NURSING] = SIDE_LEFT;
+  CHECK(model_can_switch_side(&s));
+  s.timer_side[TIMER_NURSING] = SIDE_RIGHT;
+  CHECK(model_can_switch_side(&s));
+  s.timer_state[TIMER_NURSING] = TIMER_STATE_PAUSED;       // a switch resumes a paused feed
+  CHECK(model_can_switch_side(&s));
+  s.timer_side[TIMER_NURSING] = SIDE_NONE;                 // started as "both" by another app: it can only be stopped
+  CHECK(!model_can_switch_side(&s));
+  s.timer_state[TIMER_NURSING] = TIMER_STATE_RUNNING;
+  CHECK(!model_can_switch_side(&s));
+}
+
 TEST(actions_map_to_their_timers) {
   CHECK_INT(model_timer_for_action(ACTION_SLEEP), TIMER_SLEEP);
   CHECK_INT(model_timer_for_action(ACTION_NURSING), TIMER_NURSING);
@@ -72,7 +88,8 @@ TEST(titles_and_labels) {
   CHECK_STR(model_diaper_label(DIAPER_POO), "Poo");
   CHECK_STR(model_potty_label(POTTY_SAT_DRY), "Sat dry");
   CHECK_STR(model_side_label(SIDE_LEFT), "Left");
-  CHECK_STR(model_side_label(SIDE_BOTH), "Both");
+  CHECK_STR(model_side_label(SIDE_RIGHT), "Right");
+  CHECK_STR(model_side_label(3), "?");   // there is no "Both"
   CHECK_STR(model_bottle_type_label(BOTTLE_TYPE_BREAST_MILK), "Breast milk");
   CHECK_STR(model_diaper_label(9), "?");
 }
@@ -264,6 +281,7 @@ int main(void) {
   RUN(a_paused_timer_does_not_tick);
   RUN(no_timer_has_zero_elapsed_and_a_clock_behind_the_snapshot_does_not_go_negative);
   RUN(timer_active_means_running_or_paused);
+  RUN(switch_side_needs_a_nursing_feed_that_has_a_side);
   RUN(actions_map_to_their_timers);
   RUN(titles_and_labels);
   RUN(idle_tile_shows_how_long_ago_and_the_detail);

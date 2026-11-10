@@ -65,6 +65,7 @@ function createQueue(deps) {
       case 'entry': return client.logEntry(job.babyId, job.body, job.key);
       case 'timer_start': return client.startTimer(job.babyId, job.timerType, job.body);
       case 'timer_stop': return client.stopTimer(job.babyId, job.timerType, job.body);
+      case 'timer_switch': return client.switchSide(job.babyId, job.body);
       default: return Promise.reject(new Error('unknown job kind ' + job.kind));
     }
   }
