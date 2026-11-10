@@ -84,7 +84,16 @@ function boot(opts) {
   global.setTimeout = realSetTimeout;
   Module._load = realLoad;
 
-  const settle = () => new Promise((resolve) => realSetTimeout(resolve, 20));
+  // Waits a fixed 20 ms, or, given a condition, polls until it holds (up to 2 s)
+  // so a slow CI runner cannot read the sent messages before they exist.
+  const settle = (until) => new Promise((resolve) => {
+    const started = Date.now();
+    const tick = () => {
+      if (!until || until() || Date.now() - started > 2000) resolve();
+      else realSetTimeout(tick, 5);
+    };
+    realSetTimeout(tick, 20);
+  });
   return {
     mock, sent, opened, requests, store, clayInstances, settle,
     fire: (name, event) => (listeners[name] || []).forEach((fn) => fn(event)),
@@ -101,7 +110,7 @@ test('registers the four Pebble events it needs', () => {
 test('on ready it syncs and sends the state to the watch using wire keys', async () => {
   const b = boot();
   b.fire('ready', {});
-  await b.settle();
+  await b.settle(() => b.sent.some((d) => 'STATUS' in d));
   const state = b.sent.find((d) => 'STATUS' in d);
   assert.equal(state.STATUS, P.STATUS.OK);
   assert.equal(state.BABY_NAME, 'Phoebe');
@@ -122,7 +131,7 @@ test('on ready the first message to the watch is JS_READY', async () => {
 test('with no token on ready it reports NO_TOKEN and makes no HTTP request', async () => {
   const b = boot({ token: '' });
   b.fire('ready', {});
-  await b.settle();
+  await b.settle(() => b.sent.some((d) => 'STATUS' in d));
   assert.equal(b.sent.find((d) => 'STATUS' in d).STATUS, P.STATUS.NO_TOKEN);
   assert.equal(b.requests.length, 0);
 });
@@ -130,7 +139,7 @@ test('with no token on ready it reports NO_TOKEN and makes no HTTP request', asy
 test('an appmessage from the watch becomes an acknowledged, delivered write', async () => {
   const b = boot();
   b.fire('ready', {});
-  await b.settle();
+  await b.settle(() => b.sent.some((d) => 'STATUS' in d));
   const shown = b.sent.find((d) => 'STATUS' in d);
   assert.ok(shown.BABY_KEY, 'the state names the baby');
   b.fire('appmessage', { payload: { CMD: P.CMD.LOG_DIAPER, CMD_ID: 5, ARG1: P.DIAPER.WET, ARG2: 0, BABY_KEY: shown.BABY_KEY } });
